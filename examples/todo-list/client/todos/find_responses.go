@@ -24,14 +24,12 @@ type FindReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *FindReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
-
 	case 200:
 		result := NewFindOK()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
-
 	default:
 		result := NewFindDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -59,6 +57,10 @@ type FindOK struct {
 
 func (o *FindOK) Error() string {
 	return fmt.Sprintf("[GET /][%d] findOK  %+v", 200, o.Payload)
+}
+
+func (o *FindOK) GetPayload() []*models.Item {
+	return o.Payload
 }
 
 func (o *FindOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -95,6 +97,10 @@ func (o *FindDefault) Code() int {
 
 func (o *FindDefault) Error() string {
 	return fmt.Sprintf("[GET /][%d] find default  %+v", o._statusCode, o.Payload)
+}
+
+func (o *FindDefault) GetPayload() *models.Error {
+	return o.Payload
 }
 
 func (o *FindDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

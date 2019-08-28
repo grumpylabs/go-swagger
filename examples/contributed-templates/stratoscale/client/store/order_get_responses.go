@@ -24,21 +24,18 @@ type OrderGetReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *OrderGetReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
-
 	case 200:
 		result := NewOrderGetOK()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
-
 	case 400:
 		result := NewOrderGetBadRequest()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return nil, result
-
 	case 404:
 		result := NewOrderGetNotFound()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -66,6 +63,10 @@ type OrderGetOK struct {
 
 func (o *OrderGetOK) Error() string {
 	return fmt.Sprintf("[GET /store/order/{orderId}][%d] orderGetOK  %+v", 200, o.Payload)
+}
+
+func (o *OrderGetOK) GetPayload() *models.Order {
+	return o.Payload
 }
 
 func (o *OrderGetOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

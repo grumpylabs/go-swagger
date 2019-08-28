@@ -24,14 +24,12 @@ type DeleteTaskReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *DeleteTaskReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
-
 	case 204:
 		result := NewDeleteTaskNoContent()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
-
 	default:
 		result := NewDeleteTaskDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -91,6 +89,10 @@ func (o *DeleteTaskDefault) Code() int {
 
 func (o *DeleteTaskDefault) Error() string {
 	return fmt.Sprintf("[DELETE /tasks/{id}][%d] deleteTask default  %+v", o._statusCode, o.Payload)
+}
+
+func (o *DeleteTaskDefault) GetPayload() *models.Error {
+	return o.Payload
 }
 
 func (o *DeleteTaskDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

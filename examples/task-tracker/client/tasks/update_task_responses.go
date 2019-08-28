@@ -24,21 +24,18 @@ type UpdateTaskReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *UpdateTaskReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
-
 	case 200:
 		result := NewUpdateTaskOK()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
-
 	case 422:
 		result := NewUpdateTaskUnprocessableEntity()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return nil, result
-
 	default:
 		result := NewUpdateTaskDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -68,6 +65,10 @@ func (o *UpdateTaskOK) Error() string {
 	return fmt.Sprintf("[PUT /tasks/{id}][%d] updateTaskOK  %+v", 200, o.Payload)
 }
 
+func (o *UpdateTaskOK) GetPayload() *models.Task {
+	return o.Payload
+}
+
 func (o *UpdateTaskOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
 
 	o.Payload = new(models.Task)
@@ -95,6 +96,10 @@ type UpdateTaskUnprocessableEntity struct {
 
 func (o *UpdateTaskUnprocessableEntity) Error() string {
 	return fmt.Sprintf("[PUT /tasks/{id}][%d] updateTaskUnprocessableEntity  %+v", 422, o.Payload)
+}
+
+func (o *UpdateTaskUnprocessableEntity) GetPayload() *models.ValidationError {
+	return o.Payload
 }
 
 func (o *UpdateTaskUnprocessableEntity) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -135,6 +140,10 @@ func (o *UpdateTaskDefault) Code() int {
 
 func (o *UpdateTaskDefault) Error() string {
 	return fmt.Sprintf("[PUT /tasks/{id}][%d] updateTask default  %+v", o._statusCode, o.Payload)
+}
+
+func (o *UpdateTaskDefault) GetPayload() *models.Error {
+	return o.Payload
 }
 
 func (o *UpdateTaskDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

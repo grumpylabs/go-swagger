@@ -224,20 +224,21 @@ func makeGenDefinitionHierarchy(name, pkg, container string, schema spec.Schema,
 	di := discriminatorInfo(analyzed)
 
 	pg := schemaGenContext{
-		Path:             "",
-		Name:             name,
-		Receiver:         receiver,
-		IndexVar:         "i",
-		ValueExpr:        receiver,
-		Schema:           schema,
-		Required:         false,
-		TypeResolver:     resolver,
-		Named:            true,
-		ExtraSchemas:     make(map[string]GenSchema),
-		Discrimination:   di,
-		Container:        container,
-		IncludeValidator: opts.IncludeValidator,
-		IncludeModel:     opts.IncludeModel,
+		Path:                       "",
+		Name:                       name,
+		Receiver:                   receiver,
+		IndexVar:                   "i",
+		ValueExpr:                  receiver,
+		Schema:                     schema,
+		Required:                   false,
+		TypeResolver:               resolver,
+		Named:                      true,
+		ExtraSchemas:               make(map[string]GenSchema),
+		Discrimination:             di,
+		Container:                  container,
+		IncludeValidator:           opts.IncludeValidator,
+		IncludeModel:               opts.IncludeModel,
+		StrictAdditionalProperties: opts.StrictAdditionalProperties,
 	}
 	if err := pg.makeGenSchema(); err != nil {
 		return nil, fmt.Errorf("could not generate schema for %s: %v", name, err)
@@ -405,16 +406,17 @@ func findImports(sch *GenSchema) map[string]string {
 }
 
 type schemaGenContext struct {
-	Required           bool
-	AdditionalProperty bool
-	Untyped            bool
-	Named              bool
-	RefHandled         bool
-	IsVirtual          bool
-	IsTuple            bool
-	IncludeValidator   bool
-	IncludeModel       bool
-	Index              int
+	Required                   bool
+	AdditionalProperty         bool
+	Untyped                    bool
+	Named                      bool
+	RefHandled                 bool
+	IsVirtual                  bool
+	IsTuple                    bool
+	IncludeValidator           bool
+	IncludeModel               bool
+	StrictAdditionalProperties bool
+	Index                      int
 
 	Path         string
 	Name         string
@@ -551,6 +553,7 @@ func (sg *schemaGenContext) shallowClone() *schemaGenContext {
 	pg.IsTuple = false
 	pg.IncludeValidator = sg.IncludeValidator
 	pg.IncludeModel = sg.IncludeModel
+	pg.StrictAdditionalProperties = sg.StrictAdditionalProperties
 	return pg
 }
 
@@ -1337,19 +1340,20 @@ func (sg *schemaGenContext) makeNewStruct(name string, schema spec.Schema) *sche
 	}
 	sp.Definitions[name] = schema
 	pg := schemaGenContext{
-		Path:             "",
-		Name:             name,
-		Receiver:         sg.Receiver,
-		IndexVar:         "i",
-		ValueExpr:        sg.Receiver,
-		Schema:           schema,
-		Required:         false,
-		Named:            true,
-		ExtraSchemas:     make(map[string]GenSchema),
-		Discrimination:   sg.Discrimination,
-		Container:        sg.Container,
-		IncludeValidator: sg.IncludeValidator,
-		IncludeModel:     sg.IncludeModel,
+		Path:                       "",
+		Name:                       name,
+		Receiver:                   sg.Receiver,
+		IndexVar:                   "i",
+		ValueExpr:                  sg.Receiver,
+		Schema:                     schema,
+		Required:                   false,
+		Named:                      true,
+		ExtraSchemas:               make(map[string]GenSchema),
+		Discrimination:             sg.Discrimination,
+		Container:                  sg.Container,
+		IncludeValidator:           sg.IncludeValidator,
+		IncludeModel:               sg.IncludeModel,
+		StrictAdditionalProperties: sg.StrictAdditionalProperties,
 	}
 	if schema.Ref.String() == "" {
 		pg.TypeResolver = sg.TypeResolver.NewWithModelName(name)
@@ -1772,15 +1776,16 @@ func goName(sch *spec.Schema, orig string) string {
 
 func (sg *schemaGenContext) checkNeedsPointer(outer *GenSchema, sch *GenSchema, elem *GenSchema) {
 	derefType := strings.TrimPrefix(elem.GoType, "*")
-	if outer.IsAliased && !strings.HasSuffix(outer.AliasedType, "*"+derefType) {
+	switch {
+	case outer.IsAliased && !strings.HasSuffix(outer.AliasedType, "*"+derefType):
 		// override nullability of map of primitive elements: render element of aliased or anonymous map as a pointer
 		outer.AliasedType = strings.TrimSuffix(outer.AliasedType, derefType) + "*" + derefType
-	} else if sch != nil {
+	case sch != nil:
 		// nullable primitive
 		if sch.IsAnonymous && !strings.HasSuffix(outer.GoType, "*"+derefType) {
 			sch.GoType = strings.TrimSuffix(sch.GoType, derefType) + "*" + derefType
 		}
-	} else if outer.IsAnonymous && !strings.HasSuffix(outer.GoType, "*"+derefType) {
+	case outer.IsAnonymous && !strings.HasSuffix(outer.GoType, "*"+derefType):
 		outer.GoType = strings.TrimSuffix(outer.GoType, derefType) + "*" + derefType
 	}
 }
@@ -1793,9 +1798,6 @@ func (sg *schemaGenContext) checkNeedsPointer(outer *GenSchema, sch *GenSchema, 
 // code needs to be adapted by removing IsZero() and Required() calls in codegen.
 func (sg *schemaGenContext) buildMapOfNullable(sch *GenSchema) {
 	outer := &sg.GenSchema
-	if outer == nil {
-		return
-	}
 	if sch == nil {
 		sch = outer
 	}
@@ -1846,6 +1848,7 @@ func (sg *schemaGenContext) makeGenSchema() error {
 	sg.GenSchema.ReadOnly = sg.Schema.ReadOnly
 	sg.GenSchema.IncludeValidator = sg.IncludeValidator
 	sg.GenSchema.IncludeModel = sg.IncludeModel
+	sg.GenSchema.StrictAdditionalProperties = sg.StrictAdditionalProperties
 	sg.GenSchema.Default = sg.Schema.Default
 
 	var err error

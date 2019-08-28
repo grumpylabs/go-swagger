@@ -22,7 +22,6 @@ type InventoryGetReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *InventoryGetReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
-
 	case 200:
 		result := NewInventoryGetOK()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -50,6 +49,10 @@ type InventoryGetOK struct {
 
 func (o *InventoryGetOK) Error() string {
 	return fmt.Sprintf("[GET /store/inventory][%d] inventoryGetOK  %+v", 200, o.Payload)
+}
+
+func (o *InventoryGetOK) GetPayload() map[string]int32 {
+	return o.Payload
 }
 
 func (o *InventoryGetOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

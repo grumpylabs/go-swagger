@@ -24,7 +24,6 @@ type PetUploadImageReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *PetUploadImageReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
-
 	case 200:
 		result := NewPetUploadImageOK()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -52,6 +51,10 @@ type PetUploadImageOK struct {
 
 func (o *PetUploadImageOK) Error() string {
 	return fmt.Sprintf("[POST /pet/{petId}/image][%d] petUploadImageOK  %+v", 200, o.Payload)
+}
+
+func (o *PetUploadImageOK) GetPayload() *models.APIResponse {
+	return o.Payload
 }
 
 func (o *PetUploadImageOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

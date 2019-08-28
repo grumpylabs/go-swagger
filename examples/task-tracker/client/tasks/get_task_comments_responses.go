@@ -24,14 +24,12 @@ type GetTaskCommentsReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *GetTaskCommentsReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
-
 	case 200:
 		result := NewGetTaskCommentsOK()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
-
 	default:
 		result := NewGetTaskCommentsDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -59,6 +57,10 @@ type GetTaskCommentsOK struct {
 
 func (o *GetTaskCommentsOK) Error() string {
 	return fmt.Sprintf("[GET /tasks/{id}/comments][%d] getTaskCommentsOK  %+v", 200, o.Payload)
+}
+
+func (o *GetTaskCommentsOK) GetPayload() []*models.Comment {
+	return o.Payload
 }
 
 func (o *GetTaskCommentsOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -97,6 +99,10 @@ func (o *GetTaskCommentsDefault) Code() int {
 
 func (o *GetTaskCommentsDefault) Error() string {
 	return fmt.Sprintf("[GET /tasks/{id}/comments][%d] getTaskComments default  %+v", o._statusCode, o.Payload)
+}
+
+func (o *GetTaskCommentsDefault) GetPayload() *models.Error {
+	return o.Payload
 }
 
 func (o *GetTaskCommentsDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

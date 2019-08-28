@@ -187,7 +187,7 @@ func initFixture1479Part() {
 		`type EndpointIPAMConfig struct {`,
 		"	IPV4Address string `json:\"IPv4Address,omitempty\"`",
 		"	IPV6Address string `json:\"IPv6Address,omitempty\"`",
-		"	LinkLocalIps []string `json:\"LinkLocalIPs\"`",
+		"	LinkLocalIPs []string `json:\"LinkLocalIPs\"`",
 		// empty validation
 		"func (m *EndpointIPAMConfig) Validate(formats strfmt.Registry) error {\n	return nil\n}",
 	},
@@ -682,7 +682,7 @@ func initFixture1479Part() {
 		`type ContainerCreateConfigAO1NetworkingConfigEndpointsConfigAnonIPAMConfig struct {`,
 		"	IPV4Address string `json:\"IPv4Address,omitempty\"`",
 		"	IPV6Address string `json:\"IPv6Address,omitempty\"`",
-		"	LinkLocalIps []string `json:\"LinkLocalIPs\"`",
+		"	LinkLocalIPs []string `json:\"LinkLocalIPs\"`",
 		`func (m *ContainerCreateConfigAO1NetworkingConfigEndpointsConfigAnonIPAMConfig) Validate(formats strfmt.Registry) error {`,
 		`		return errors.CompositeValidationError(res...`,
 		`type ContainerCreateConfigHostConfigAO0LogConfig struct {`,
@@ -830,7 +830,7 @@ func initFixture1479Part() {
 		`type EndpointSettingsIPAMConfig struct {`,
 		"	IPV4Address string `json:\"IPv4Address,omitempty\"`",
 		"	IPV6Address string `json:\"IPv6Address,omitempty\"`",
-		"	LinkLocalIps []string `json:\"LinkLocalIPs\"`",
+		"	LinkLocalIPs []string `json:\"LinkLocalIPs\"`",
 		`func (m *EndpointSettingsIPAMConfig) Validate(formats strfmt.Registry) error {`,
 		`		return errors.CompositeValidationError(res...`,
 	},
@@ -10925,6 +10925,35 @@ func initFixtureRealiasedTypes() {
 		`	Hsubtype1`,
 		// empty validation
 		"func (m *Hs0) Validate(formats strfmt.Registry) error {\n	return nil\n}",
+	},
+		// not expected
+		todo,
+		// output in log
+		noLines,
+		noLines)
+}
+
+func initFixture1993() {
+	/*
+	   required / non required base type
+	*/
+
+	f := newModelFixture("../fixtures/bugs/1993/fixture-1993.yaml", "test required/non required base type")
+	thisRun := f.AddRun(false).WithMinimalFlatten(true)
+
+	// load expectations for model: house.go
+	thisRun.AddExpectations("house.go", []string{
+		`if err := validate.Required("pet", "body", m.Pet()); err != nil {`,
+	},
+		// not expected
+		todo,
+		// output in log
+		noLines,
+		noLines)
+
+	// load expectations for model: empty_house.go
+	thisRun.AddExpectations("empty_house.go", []string{
+		`if swag.IsZero(m.Pet())`,
 	},
 		// not expected
 		todo,

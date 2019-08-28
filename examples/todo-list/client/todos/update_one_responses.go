@@ -24,14 +24,12 @@ type UpdateOneReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *UpdateOneReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
-
 	case 200:
 		result := NewUpdateOneOK()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
-
 	default:
 		result := NewUpdateOneDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -59,6 +57,10 @@ type UpdateOneOK struct {
 
 func (o *UpdateOneOK) Error() string {
 	return fmt.Sprintf("[PUT /{id}][%d] updateOneOK  %+v", 200, o.Payload)
+}
+
+func (o *UpdateOneOK) GetPayload() *models.Item {
+	return o.Payload
 }
 
 func (o *UpdateOneOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -97,6 +99,10 @@ func (o *UpdateOneDefault) Code() int {
 
 func (o *UpdateOneDefault) Error() string {
 	return fmt.Sprintf("[PUT /{id}][%d] updateOne default  %+v", o._statusCode, o.Payload)
+}
+
+func (o *UpdateOneDefault) GetPayload() *models.Error {
+	return o.Payload
 }
 
 func (o *UpdateOneDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

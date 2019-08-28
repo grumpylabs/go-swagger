@@ -156,7 +156,7 @@ func init() {
 	testedModels = make([]*modelFixture, 0, 50)
 	noLines = []string{}
 	todo = []string{`TODO`}
-	validatable = append(todo, `Validate(`)
+	validatable = append([]string{`Validate(`}, todo...)
 	warning = []string{`warning`}
 }
 
@@ -200,6 +200,9 @@ func initModelFixtures() {
 
 	// type realiasing
 	initFixtureRealiasedTypes()
+
+	// required base type
+	initFixture1993()
 }
 
 /* Template initTxxx() to prepare and load a fixture:

@@ -27,14 +27,12 @@ type AddCommentToTaskReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *AddCommentToTaskReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
-
 	case 201:
 		result := NewAddCommentToTaskCreated()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
-
 	default:
 		result := NewAddCommentToTaskDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -94,6 +92,10 @@ func (o *AddCommentToTaskDefault) Code() int {
 
 func (o *AddCommentToTaskDefault) Error() string {
 	return fmt.Sprintf("[POST /tasks/{id}/comments][%d] addCommentToTask default  %+v", o._statusCode, o.Payload)
+}
+
+func (o *AddCommentToTaskDefault) GetPayload() *models.Error {
+	return o.Payload
 }
 
 func (o *AddCommentToTaskDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

@@ -26,21 +26,18 @@ type ListTasksReader struct {
 // ReadResponse reads a server response into the received o.
 func (o *ListTasksReader) ReadResponse(response runtime.ClientResponse, consumer runtime.Consumer) (interface{}, error) {
 	switch response.Code() {
-
 	case 200:
 		result := NewListTasksOK()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return result, nil
-
 	case 422:
 		result := NewListTasksUnprocessableEntity()
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
 			return nil, err
 		}
 		return nil, result
-
 	default:
 		result := NewListTasksDefault(response.Code())
 		if err := result.readResponse(response, consumer, o.formats); err != nil {
@@ -72,6 +69,10 @@ type ListTasksOK struct {
 
 func (o *ListTasksOK) Error() string {
 	return fmt.Sprintf("[GET /tasks][%d] listTasksOK  %+v", 200, o.Payload)
+}
+
+func (o *ListTasksOK) GetPayload() []*models.TaskCard {
+	return o.Payload
 }
 
 func (o *ListTasksOK) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -106,6 +107,10 @@ type ListTasksUnprocessableEntity struct {
 
 func (o *ListTasksUnprocessableEntity) Error() string {
 	return fmt.Sprintf("[GET /tasks][%d] listTasksUnprocessableEntity  %+v", 422, o.Payload)
+}
+
+func (o *ListTasksUnprocessableEntity) GetPayload() *models.ValidationError {
+	return o.Payload
 }
 
 func (o *ListTasksUnprocessableEntity) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {
@@ -146,6 +151,10 @@ func (o *ListTasksDefault) Code() int {
 
 func (o *ListTasksDefault) Error() string {
 	return fmt.Sprintf("[GET /tasks][%d] listTasks default  %+v", o._statusCode, o.Payload)
+}
+
+func (o *ListTasksDefault) GetPayload() *models.Error {
+	return o.Payload
 }
 
 func (o *ListTasksDefault) readResponse(response runtime.ClientResponse, consumer runtime.Consumer, formats strfmt.Registry) error {

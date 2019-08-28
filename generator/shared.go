@@ -28,6 +28,7 @@ import (
 	"sort"
 	"strings"
 	"text/template"
+	"unicode"
 
 	swaggererrors "github.com/go-openapi/errors"
 
@@ -235,9 +236,9 @@ func GoLangOpts() *LanguageOpts {
 		var pth string
 		for _, gp := range filepath.SplitList(gopath) {
 			// EvalSymLinks also calls the Clean
-			gopathExtended, err := filepath.EvalSymlinks(gp)
-			if err != nil {
-				log.Fatalln(err)
+			gopathExtended, er := filepath.EvalSymlinks(gp)
+			if er != nil {
+				log.Fatalln(er)
 			}
 			gopathExtended = filepath.Join(gopathExtended, "src")
 			gp = filepath.Join(gp, "src")
@@ -540,21 +541,22 @@ type SectionOpts struct {
 
 // GenOpts the options for the generator
 type GenOpts struct {
-	IncludeModel        bool
-	IncludeValidator    bool
-	IncludeHandler      bool
-	IncludeParameters   bool
-	IncludeResponses    bool
-	IncludeURLBuilder   bool
-	IncludeMain         bool
-	IncludeSupport      bool
-	ExcludeSpec         bool
-	DumpData            bool
-	ValidateSpec        bool
-	FlattenOpts         *analysis.FlattenOpts
-	IsClient            bool
-	defaultsEnsured     bool
-	PropertiesSpecOrder bool
+	IncludeModel               bool
+	IncludeValidator           bool
+	IncludeHandler             bool
+	IncludeParameters          bool
+	IncludeResponses           bool
+	IncludeURLBuilder          bool
+	IncludeMain                bool
+	IncludeSupport             bool
+	ExcludeSpec                bool
+	DumpData                   bool
+	ValidateSpec               bool
+	FlattenOpts                *analysis.FlattenOpts
+	IsClient                   bool
+	defaultsEnsured            bool
+	PropertiesSpecOrder        bool
+	StrictAdditionalProperties bool
 
 	Spec                   string
 	APIPackage             string
@@ -1074,17 +1076,40 @@ func gatherOperations(specDoc *analysis.Spec, operationIDs []string) map[string]
 }
 
 func pascalize(arg string) string {
-	if len(arg) == 0 || arg[0] > '9' {
-		return swag.ToGoName(arg)
+	runes := []rune(arg)
+	switch len(runes) {
+	case 0:
+		return ""
+	case 1: // handle special case when we have a single rune that is not handled by swag.ToGoName
+		switch runes[0] {
+		case '+', '-', '#', '_': // those cases are handled differently than swag utility
+			return prefixForName(arg)
+		}
 	}
-	if arg[0] == '+' {
-		return swag.ToGoName("Plus " + arg[1:])
-	}
-	if arg[0] == '-' {
-		return swag.ToGoName("Minus " + arg[1:])
-	}
+	return swag.ToGoName(swag.ToGoName(arg)) // want to remove spaces
+}
 
-	return swag.ToGoName("Nr " + arg)
+func prefixForName(arg string) string {
+	first := []rune(arg)[0]
+	if len(arg) == 0 || unicode.IsLetter(first) {
+		return ""
+	}
+	switch first {
+	case '+':
+		return "Plus"
+	case '-':
+		return "Minus"
+	case '#':
+		return "HashTag"
+		// other cases ($,@ etc..) handled by swag.ToGoName
+	}
+	return "Nr"
+}
+
+func init() {
+	// this makes the ToGoName func behave with the special
+	// prefixing rule above
+	swag.GoNamePrefixFunc = prefixForName
 }
 
 func pruneEmpty(in []string) (out []string) {
@@ -1149,11 +1174,12 @@ func validateAndFlattenSpec(opts *GenOpts, specDoc *loads.Document) (*loads.Docu
 	opts.FlattenOpts.Spec = analysis.New(specDoc.Spec())
 
 	var preprocessingOption string
-	if opts.FlattenOpts.Expand {
+	switch {
+	case opts.FlattenOpts.Expand:
 		preprocessingOption = "expand"
-	} else if opts.FlattenOpts.Minimal {
+	case opts.FlattenOpts.Minimal:
 		preprocessingOption = "minimal flattening"
-	} else {
+	default:
 		preprocessingOption = "full flattening"
 	}
 	log.Printf("preprocessing spec with option:  %s", preprocessingOption)

@@ -74,6 +74,7 @@ func init() {
 	maxHeaderSize = flagext.ByteSize(1000000)
 
 	flag.StringSliceVar(&enabledListeners, "scheme", defaultSchemes, "the listeners to enable, this can be repeated and defaults to the schemes in the swagger spec")
+
 	flag.DurationVar(&cleanupTimeout, "cleanup-timeout", 10*time.Second, "grace period for which to wait before killing idle connections")
 	flag.DurationVar(&gracefulTimeout, "graceful-timeout", 15*time.Second, "grace period for which to wait before shutting down the server")
 	flag.Var(&maxHeaderSize, "max-header-size", "controls the maximum number of bytes the server will read parsing the request header's keys and values, including the request line. It does not limit the size of the request body")
@@ -278,8 +279,6 @@ func (s *Server) Serve() (err error) {
 	go handleInterrupt(once, s)
 
 	servers := []*http.Server{}
-	wg.Add(1)
-	go s.handleShutdown(wg, &servers)
 
 	if s.hasScheme(schemeUnix) {
 		domainSocket := new(http.Server)
@@ -429,6 +428,9 @@ func (s *Server) Serve() (err error) {
 		}(tls.NewListener(s.httpsServerL, httpsServer.TLSConfig))
 	}
 
+	wg.Add(1)
+	go s.handleShutdown(wg, &servers)
+
 	wg.Wait()
 	return nil
 }
@@ -524,6 +526,9 @@ func (s *Server) handleShutdown(wg *sync.WaitGroup, serversPtr *[]*http.Server) 
 	ctx, cancel := context.WithTimeout(context.TODO(), s.GracefulTimeout)
 	defer cancel()
 
+	// first execute the pre-shutdown hook
+	s.api.PreServerShutdown()
+
 	shutdownChan := make(chan bool)
 	for i := range servers {
 		server := servers[i]
@@ -593,7 +598,7 @@ func (s *Server) TLSListener() (net.Listener, error) {
 
 func handleInterrupt(once *sync.Once, s *Server) {
 	once.Do(func() {
-		for _ = range s.interrupt {
+		for range s.interrupt {
 			if s.interrupted {
 				s.Logf("Server already shutting down")
 				continue

@@ -42,7 +42,9 @@ func (tt *templateTest) assertRender(data interface{}, expected string) bool {
 	if !assert.NoError(tt.t, err) {
 		return false
 	}
-	return assert.Equal(tt.t, expected, buf.String())
+	trimmed := strings.TrimLeft(buf.String(), "\n\t ")
+	exp := strings.TrimLeft(expected, "\n\t ")
+	return assert.Equal(tt.t, exp, trimmed)
 }
 
 func TestGenerateModel_Sanity(t *testing.T) {
@@ -82,7 +84,8 @@ func TestGenerateModel_Sanity(t *testing.T) {
 }
 
 func TestGenerateModel_DocString(t *testing.T) {
-	templ := template.Must(template.New("docstring").Funcs(FuncMap).Parse(string(assets["docstring.gotmpl"])))
+	funcMap := FuncMapFunc(DefaultLanguageFunc())
+	templ := template.Must(template.New("docstring").Funcs(funcMap).Parse(string(assets["docstring.gotmpl"])))
 	tt := templateTest{t, templ}
 
 	var gmp GenSchema
@@ -104,7 +107,8 @@ func TestGenerateModel_DocString(t *testing.T) {
 }
 
 func TestGenerateModel_PropertyValidation(t *testing.T) {
-	templ := template.Must(template.New("propertyValidationDocString").Funcs(FuncMap).Parse(string(assets["validation/structfield.gotmpl"])))
+	funcMap := FuncMapFunc(DefaultLanguageFunc())
+	templ := template.Must(template.New("propertyValidationDocString").Funcs(funcMap).Parse(string(assets["validation/structfield.gotmpl"])))
 	tt := templateTest{t, templ}
 
 	var gmp GenSchema
@@ -181,6 +185,7 @@ func TestGenerateModel_SchemaField(t *testing.T) {
 	gmp.MinItems = &in2
 	gmp.UniqueItems = true
 	gmp.ReadOnly = true
+	gmp.StructTags = []string{"json", "db"}
 	tt.assertRender(gmp, `// The title of the property
 //
 // The description of the property
@@ -194,7 +199,7 @@ func TestGenerateModel_SchemaField(t *testing.T) {
 // Max Items: 30
 // Min Items: 30
 // Unique: true
-`+"SomeName string `json:\"some name\" mytag:\"foobar,foobaz\"`\n")
+`+"SomeName string `json:\"some name\" db:\"some name\" mytag:\"foobar,foobaz\"`\n")
 }
 
 var schTypeGenDataSimple = []struct {
@@ -259,7 +264,7 @@ func TestGenerateModel_Primitives(t *testing.T) {
 			tt.assertRender(&val, "type TheType "+exp+"\n  \n")
 			continue
 		}
-		tt.assertRender(&val, "type TheType "+exp+"\n  // Validate validates this the type\nfunc (o theType) Validate(formats strfmt.Registry) error {\n  return nil\n}\n")
+		tt.assertRender(&val, "type TheType "+exp+"\n  \n// Validate validates this the type\nfunc (o theType) Validate(formats strfmt.Registry) error {\n  return nil\n}\n")
 	}
 }
 
@@ -949,7 +954,6 @@ func TestGenerateModel_Statix(t *testing.T) {
 		schema := definitions[k]
 		opts := opts()
 		genModel, err := makeGenDefinition(k, "models", schema, specDoc, opts)
-		// spew.Dump(genModel)
 		if assert.NoError(t, err) {
 			buf := bytes.NewBuffer(nil)
 			err := templates.MustGet("model").Execute(buf, genModel)
@@ -2487,9 +2491,12 @@ func TestGenModel_Issue1623(t *testing.T) {
 	assertInCode(t, "GeneralHasOmitEmptyFalse string `json:\"generalHasOmitEmptyFalse\"`", res)
 	assertInCode(t, "GeneralHasOmitEmptyTrue string `json:\"generalHasOmitEmptyTrue,omitempty\"`", res)
 	assertInCode(t, "GeneralNoOmitEmpty string `json:\"generalNoOmitEmpty,omitempty\"`", res)
-	assertInCode(t, "RefHasOmitEmptyFalse Bar `json:\"refHasOmitEmptyFalse\"`", res)
+	assertInCode(t, "RefHasOmitEmptyFalse Bar `json:\"refHasOmitEmptyFalse,omitempty\"`", res)
 	assertInCode(t, "RefHasOmitEmptyTrue Bar `json:\"refHasOmitEmptyTrue,omitempty\"`", res)
 	assertInCode(t, "RefNoOmitEmpty Bar `json:\"refNoOmitEmpty,omitempty\"`", res)
+	assertInCode(t, "IntHasJSONString int64 `json:\"intHasJsonString,omitempty,string\"`", res)
+	assertInCode(t, "BoolHasJSONString bool `json:\"boolHasJsonString,omitempty,string\"`", res)
+
 }
 
 func TestGenModel_KeepSpecPropertiesOrder(t *testing.T) {
@@ -2499,7 +2506,7 @@ func TestGenModel_KeepSpecPropertiesOrder(t *testing.T) {
 
 	specDoc, err := loads.Spec(ymlFile)
 	assert.NoError(t, err)
-	orderedSpecDoc, err := loads.Spec(withAutoXOrder(ymlFile))
+	orderedSpecDoc, err := loads.Spec(WithAutoXOrder(ymlFile))
 	assert.NoError(t, err)
 
 	definitions := specDoc.Spec().Definitions
@@ -2582,6 +2589,65 @@ func TestGenModel_StrictAdditionalProperties(t *testing.T) {
 							tt.assertion(t, "dec.DisallowUnknownFields()", fn)
 						}
 					}
+				} else {
+					fmt.Println(buf.String())
+				}
+			}
+		}
+	}
+}
+
+func TestGenModel_XMLStructTags_WithXML(t *testing.T) {
+	specDoc, err := loads.Spec("../fixtures/codegen/xml-model.yml")
+	if assert.NoError(t, err) {
+		definitions := specDoc.Spec().Definitions
+		k := "XmlWithAttribute"
+		opts := opts()
+		opts.WithXML = true
+
+		genModel, err := makeGenDefinition(k, "models", definitions[k], specDoc, opts)
+		if assert.NoError(t, err) {
+			buf := bytes.NewBuffer(nil)
+			err := templates.MustGet("model").Execute(buf, genModel)
+			if assert.NoError(t, err) {
+				ct, err := opts.LanguageOpts.FormatContent("xml_with_attribute.go", buf.Bytes())
+				if assert.NoError(t, err) {
+					res := string(ct)
+					assertInCode(t, "Author *string `json:\"author\" xml:\"author\"`", res)
+					assertInCode(t, "Children []*XMLChild `json:\"children\" xml:\"children\"`", res)
+					assertInCode(t, "ID int64 `json:\"id,omitempty\" xml:\"id,attr,omitempty\"`", res)
+					assertInCode(t, "IsPublished *bool `json:\"isPublished\" xml:\"published,attr\"`", res)
+					assertInCode(t, "SingleChild *XMLChild `json:\"singleChild,omitempty\" xml:\"singleChild,omitempty\"`", res)
+					assertInCode(t, "Title string `json:\"title,omitempty\" xml:\"xml-title,omitempty\"`", res)
+				} else {
+					fmt.Println(buf.String())
+				}
+			}
+		}
+	}
+}
+
+func TestGenModel_XMLStructTags_Explicit(t *testing.T) {
+	specDoc, err := loads.Spec("../fixtures/codegen/xml-model.yml")
+	if assert.NoError(t, err) {
+		definitions := specDoc.Spec().Definitions
+		k := "XmlWithAttribute"
+		opts := opts()
+
+		genModel, err := makeGenDefinition(k, "models", definitions[k], specDoc, opts)
+		if assert.NoError(t, err) {
+			buf := bytes.NewBuffer(nil)
+			err := templates.MustGet("model").Execute(buf, genModel)
+			if assert.NoError(t, err) {
+				ct, err := opts.LanguageOpts.FormatContent("xml_with_attribute.go", buf.Bytes())
+				if assert.NoError(t, err) {
+					res := string(ct)
+					assertInCode(t, "Author *string `json:\"author\"`", res)
+					assertInCode(t, "Children []*XMLChild `json:\"children\"`", res)
+					assertInCode(t, "ID int64 `json:\"id,omitempty\" xml:\"id,attr,omitempty\"`", res)
+					assertInCode(t, "IsPublished *bool `json:\"isPublished\" xml:\"published,attr\"`", res)
+					assertInCode(t, "SingleChild *XMLChild `json:\"singleChild,omitempty\"`", res)
+					assertInCode(t, "Title string `json:\"title,omitempty\" xml:\"xml-title,omitempty\"`", res)
 				} else {
 					fmt.Println(buf.String())
 				}

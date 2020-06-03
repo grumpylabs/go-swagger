@@ -10,11 +10,31 @@ rpm, deb and docker image.
 
 ### Docker image [![Docker Repository on Quay](https://quay.io/repository/goswagger/swagger/status "Docker Repository on Quay")](https://quay.io/repository/goswagger/swagger)
 
+First grab the image:
+
 ```
 docker pull quay.io/goswagger/swagger
+```
 
-alias swagger="docker run --rm -it -e GOPATH=$HOME/go:/go -v $HOME:$HOME -w $(pwd) quay.io/goswagger/swagger"
+#### For Mac And Linux users:
+
+```bash
+alias swagger="docker run --rm -it  --user $(id -u):$(id -g) -e GOPATH=$HOME/go:/go -v $HOME:$HOME -w $(pwd) quay.io/goswagger/swagger"
 swagger version
+```
+
+#### For windows users:
+
+```cmd
+docker run --rm -it --env GOPATH=/go -v %CD%:/go/src -w /go/src quay.io/goswagger/swagger
+```
+
+You can put the following in a file called **swagger.bat** and include it in your path environment variable to act as an alias.
+
+```batch
+@echo off
+echo.
+docker run --rm -it --env GOPATH=/go -v %CD%:/go/src -w /go/src quay.io/goswagger/swagger %*
 ```
 
 ### Homebrew/Linuxbrew
@@ -41,7 +61,11 @@ chmod +x /usr/local/bin/swagger
 This repo will work for any debian, the only file it contains gets copied to `/usr/bin`
 
 ```
-echo "deb https://dl.bintray.com/go-swagger/goswagger-debian ubuntu main" | sudo tee -a /etc/apt/sources.list
+sudo apt install gnupg ca-certificates
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61
+echo "deb https://dl.bintray.com/go-swagger/goswagger-debian ubuntu main" | sudo tee /etc/apt/sources.list.d/goswagger.list
+apt update 
+apt install swagger
 ```
 
 ### RPM packages [ ![Download](https://api.bintray.com/packages/go-swagger/goswagger-rpm/swagger/images/download.svg) ](https://bintray.com/go-swagger/goswagger-rpm/swagger/_latestVersion)

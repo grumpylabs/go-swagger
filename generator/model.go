@@ -15,11 +15,8 @@
 package generator
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
-	"os"
 	"path"
 	"path/filepath"
 	"sort"
@@ -51,22 +48,15 @@ Every action that happens tracks the path which is a linked list of refs
 
 // GenerateDefinition generates a model file for a schema definition.
 func GenerateDefinition(modelNames []string, opts *GenOpts) error {
-	if opts == nil {
-		return errors.New("gen opts are required")
-	}
-
-	if opts.TemplateDir != "" {
-		if err := templates.LoadDir(opts.TemplateDir); err != nil {
-			return err
-		}
-	}
-
 	if err := opts.CheckOpts(); err != nil {
 		return err
 	}
 
-	// Load the spec
-	specPath, specDoc, err := loadSpec(opts.Spec)
+	if err := opts.setTemplates(); err != nil {
+		return err
+	}
+
+	specDoc, _, err := opts.analyzeSpec()
 	if err != nil {
 		return err
 	}
@@ -81,7 +71,7 @@ func GenerateDefinition(modelNames []string, opts *GenOpts) error {
 		// lookup schema
 		model, ok := specDoc.Spec().Definitions[modelName]
 		if !ok {
-			return fmt.Errorf("model %q not found in definitions given by %q", modelName, specPath)
+			return fmt.Errorf("model %q not found in definitions given by %q", modelName, opts.Spec)
 		}
 
 		// generate files
@@ -119,9 +109,7 @@ func (m *definitionGenerator) Generate() error {
 	}
 
 	if m.opts.DumpData {
-		bb, _ := json.MarshalIndent(swag.ToDynamicJSON(mod), "", " ")
-		fmt.Fprintln(os.Stdout, string(bb))
-		return nil
+		return dumpData(swag.ToDynamicJSON(mod))
 	}
 
 	if m.opts.IncludeModel {
@@ -173,7 +161,7 @@ func shallowValidationLookup(sch GenSchema) bool {
 	if sch.IsStream || sch.IsInterface { // these types have no validation - aliased types on those do not implement the Validatable interface
 		return false
 	}
-	if sch.Required || sch.IsCustomFormatter && !sch.IsStream {
+	if sch.Required || hasFormatValidation(sch.resolvedType) {
 		return true
 	}
 	if sch.MaxLength != nil || sch.MinLength != nil || sch.Pattern != "" || sch.MultipleOf != nil || sch.Minimum != nil || sch.Maximum != nil || len(sch.Enum) > 0 || len(sch.ItemsEnum) > 0 {
@@ -239,6 +227,8 @@ func makeGenDefinitionHierarchy(name, pkg, container string, schema spec.Schema,
 		IncludeValidator:           opts.IncludeValidator,
 		IncludeModel:               opts.IncludeModel,
 		StrictAdditionalProperties: opts.StrictAdditionalProperties,
+		WithXML:                    opts.WithXML,
+		StructTags:                 opts.StructTags,
 	}
 	if err := pg.makeGenSchema(); err != nil {
 		return nil, fmt.Errorf("could not generate schema for %s: %v", name, err)
@@ -334,17 +324,17 @@ func makeGenDefinitionHierarchy(name, pkg, container string, schema spec.Schema,
 
 	}
 
-	defaultImports := []string{
-		"github.com/go-openapi/errors",
-		"github.com/go-openapi/runtime",
-		"github.com/go-openapi/swag",
-		"github.com/go-openapi/validate",
+	defaultImports := map[string]string{
+		"errors":   "github.com/go-openapi/errors",
+		"runtime":  "github.com/go-openapi/runtime",
+		"swag":     "github.com/go-openapi/swag",
+		"validate": "github.com/go-openapi/validate",
 	}
 
 	return &GenDefinition{
 		GenCommon: GenCommon{
 			Copyright:        opts.Copyright,
-			TargetImportPath: filepath.ToSlash(opts.LanguageOpts.baseImport(opts.Target)),
+			TargetImportPath: opts.LanguageOpts.baseImport(opts.Target),
 		},
 		Package:        opts.LanguageOpts.ManglePackageName(path.Base(filepath.ToSlash(pkg)), "definitions"),
 		GenSchema:      pg.GenSchema,
@@ -416,6 +406,7 @@ type schemaGenContext struct {
 	IncludeValidator           bool
 	IncludeModel               bool
 	StrictAdditionalProperties bool
+	WithXML                    bool
 	Index                      int
 
 	Path         string
@@ -429,6 +420,7 @@ type schemaGenContext struct {
 	Container    string
 	Schema       spec.Schema
 	TypeResolver *typeResolver
+	StructTags   []string
 
 	GenSchema      GenSchema
 	Dependencies   []string // NOTE: Dependencies is actually set nowhere
@@ -546,7 +538,7 @@ func (sg *schemaGenContext) shallowClone() *schemaGenContext {
 	if pg.Container == "" {
 		pg.Container = sg.Name
 	}
-	pg.GenSchema = GenSchema{}
+	pg.GenSchema = GenSchema{StructTags: sg.StructTags}
 	pg.Dependencies = nil
 	pg.Named = false
 	pg.Index = 0
@@ -617,6 +609,16 @@ func hasValidations(model *spec.Schema, isRequired bool) (hasValidation bool) {
 	hasValidation = hasNumberValidation || hasStringValidation || hasSliceValidations(model) || hasEnum || simpleObject || hasAllOfValidation || isRequired
 
 	return
+}
+
+func hasFormatValidation(tpe resolvedType) bool {
+	if tpe.IsCustomFormatter && !tpe.IsStream && !tpe.IsBase64 {
+		return true
+	}
+	if tpe.IsArray && tpe.ElemType != nil {
+		return hasFormatValidation(*tpe.ElemType)
+	}
+	return false
 }
 
 // handleFormatConflicts handles all conflicting model properties when a format is set
@@ -700,7 +702,7 @@ func (sg *schemaGenContext) buildProperties() error {
 			sg.Name, k, sg.IsTuple, sg.GenSchema.HasValidations)
 
 		// check if this requires de-anonymizing, if so lift this as a new struct and extra schema
-		tpe, err := sg.TypeResolver.ResolveSchema(&v, true, sg.IsTuple || containsString(sg.Schema.Required, k))
+		tpe, err := sg.TypeResolver.ResolveSchema(&v, true, sg.IsTuple || swag.ContainsStrings(sg.Schema.Required, k))
 		if sg.Schema.Discriminator == k {
 			tpe.IsNullable = false
 		}
@@ -752,7 +754,7 @@ func (sg *schemaGenContext) buildProperties() error {
 		}
 
 		// generates format validation on property
-		emprop.GenSchema.HasValidations = emprop.GenSchema.HasValidations || (tpe.IsCustomFormatter && !tpe.IsStream) || (tpe.IsArray && tpe.ElemType.IsCustomFormatter && !tpe.ElemType.IsStream)
+		emprop.GenSchema.HasValidations = emprop.GenSchema.HasValidations || hasFormatValidation(tpe)
 
 		if emprop.Schema.Ref.String() != "" {
 			// expand the schema of this property, so we take informed decisions about its type
@@ -802,7 +804,7 @@ func (sg *schemaGenContext) buildProperties() error {
 			hv := hasValidations(sch, false)
 
 			// include format validation, excluding binary
-			hv = hv || (ttpe.IsCustomFormatter && !ttpe.IsStream) || (ttpe.IsArray && ttpe.ElemType.IsCustomFormatter && !ttpe.ElemType.IsStream)
+			hv = hv || hasFormatValidation(ttpe)
 
 			// a base type property is always validated against the base type
 			// exception: for the base type definition itself (see shallowValidationLookup())
@@ -1309,7 +1311,7 @@ func (sg *schemaGenContext) buildAdditionalProperties() error {
 		}
 
 		hasMapNullOverride := sg.GenSchema.IsMapNullOverride
-		sg.GenSchema = GenSchema{}
+		sg.GenSchema = GenSchema{StructTags: sg.StructTags}
 		sg.Schema = *spec.RefProperty("#/definitions/" + newObj.Name)
 		if err := sg.makeGenSchema(); err != nil {
 			return err
@@ -1354,6 +1356,7 @@ func (sg *schemaGenContext) makeNewStruct(name string, schema spec.Schema) *sche
 		IncludeValidator:           sg.IncludeValidator,
 		IncludeModel:               sg.IncludeModel,
 		StrictAdditionalProperties: sg.StrictAdditionalProperties,
+		StructTags:                 sg.StructTags,
 	}
 	if schema.Ref.String() == "" {
 		pg.TypeResolver = sg.TypeResolver.NewWithModelName(name)
@@ -1417,10 +1420,8 @@ func (sg *schemaGenContext) buildArray() error {
 	schemaCopy.Required = false
 
 	// validations of items
-	hv := hasValidations(sg.Schema.Items.Schema, false)
-
-	// include format validation, excluding binary
-	hv = hv || (schemaCopy.IsCustomFormatter && !schemaCopy.IsStream) || (schemaCopy.IsArray && schemaCopy.ElemType.IsCustomFormatter && !schemaCopy.ElemType.IsStream)
+	// include format validation, excluding binary and base64 format validation
+	hv := hasValidations(sg.Schema.Items.Schema, false) || hasFormatValidation(schemaCopy.resolvedType)
 
 	// base types of polymorphic types must be validated
 	// NOTE: IsNullable is not useful to figure out a validation: we use Refed and IsAliased below instead
@@ -1579,16 +1580,21 @@ func (sg *schemaGenContext) buildAdditionalItems() error {
 	return nil
 }
 
-func (sg *schemaGenContext) buildXMLName() error {
-	if sg.Schema.XML == nil {
-		return nil
-	}
-	sg.GenSchema.XMLName = sg.Name
+func (sg *schemaGenContext) buildXMLNameWithTags() error {
+	if sg.WithXML || sg.Schema.XML != nil {
+		sg.GenSchema.XMLName = sg.Name
 
-	if sg.Schema.XML.Name != "" {
-		sg.GenSchema.XMLName = sg.Schema.XML.Name
-		if sg.Schema.XML.Attribute {
-			sg.GenSchema.XMLName += ",attr"
+		if sg.Schema.XML != nil {
+			if sg.Schema.XML.Name != "" {
+				sg.GenSchema.XMLName = sg.Schema.XML.Name
+			}
+			if sg.Schema.XML.Attribute {
+				sg.GenSchema.XMLName += ",attr"
+			}
+		}
+
+		if !sg.GenSchema.Required && sg.GenSchema.IsEmptyOmitted {
+			sg.GenSchema.XMLName += ",omitempty"
 		}
 	}
 	return nil
@@ -1850,6 +1856,7 @@ func (sg *schemaGenContext) makeGenSchema() error {
 	sg.GenSchema.IncludeModel = sg.IncludeModel
 	sg.GenSchema.StrictAdditionalProperties = sg.StrictAdditionalProperties
 	sg.GenSchema.Default = sg.Schema.Default
+	sg.GenSchema.StructTags = sg.StructTags
 
 	var err error
 	returns, err := sg.shortCircuitNamedRef()
@@ -1891,7 +1898,7 @@ func (sg *schemaGenContext) makeGenSchema() error {
 	sg.GenSchema.HasDiscriminator = tpe.HasDiscriminator
 
 	// include format validations, excluding binary
-	sg.GenSchema.HasValidations = sg.GenSchema.HasValidations || (tpe.IsCustomFormatter && !tpe.IsStream) || (tpe.IsArray && tpe.ElemType != nil && tpe.ElemType.IsCustomFormatter && !tpe.ElemType.IsStream)
+	sg.GenSchema.HasValidations = sg.GenSchema.HasValidations || hasFormatValidation(tpe)
 
 	// usage of a polymorphic base type is rendered with getter funcs on private properties.
 	// In the case of aliased types, the value expression remains unchanged to the receiver.
@@ -1938,7 +1945,7 @@ func (sg *schemaGenContext) makeGenSchema() error {
 		return err
 	}
 
-	if err := sg.buildXMLName(); err != nil {
+	if err := sg.buildXMLNameWithTags(); err != nil {
 		return err
 	}
 
@@ -1955,6 +1962,21 @@ func (sg *schemaGenContext) makeGenSchema() error {
 	}
 
 	sg.buildMapOfNullable(nil)
+
+	// extra serializers & interfaces
+
+	// generate MarshalBinary for:
+	// - tuple
+	// - struct
+	// - map
+	// - aliased primitive of a formatter type which is not a stringer
+	//
+	// but not for:
+	// - interface{}
+	// - io.Reader
+	gs := sg.GenSchema
+	sg.GenSchema.WantsMarshalBinary = !(gs.IsInterface || gs.IsStream || gs.IsBaseType) &&
+		(gs.IsTuple || gs.IsComplexObject || gs.IsAdditionalProperties || (gs.IsPrimitive && gs.IsAliased && gs.IsCustomFormatter && !strings.Contains(gs.Zero(), `("`)))
 
 	debugLog("finished gen schema for %q", sg.Name)
 	return nil

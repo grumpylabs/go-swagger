@@ -28,68 +28,60 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/swag"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBodyParams(t *testing.T) {
 	b, err := opBuilder("updateTask", "../fixtures/codegen/todolist.bodyparams.yml")
-
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
+	require.NoError(t, err)
 
 	_, _, op, ok := b.Analyzed.OperationForName("updateTask")
-	if assert.True(t, ok) && assert.NotNil(t, op) {
-		resolver := &typeResolver{ModelsPackage: b.ModelsPackage, Doc: b.Doc}
-		resolver.KnownDefs = make(map[string]struct{})
-		for k := range b.Doc.Spec().Definitions {
-			resolver.KnownDefs[k] = struct{}{}
-		}
-		for _, param := range op.Parameters {
-			if param.Name == "body" {
-				gp, perr := b.MakeParameter("a", resolver, param, nil)
-				if assert.NoError(t, perr) {
-					assert.True(t, gp.IsBodyParam())
-					if assert.NotNil(t, gp.Schema) {
-						assert.True(t, gp.Schema.IsComplexObject)
-						assert.False(t, gp.Schema.IsAnonymous)
-						assert.Equal(t, "models.Task", gp.Schema.GoType)
-					}
-				}
-			}
+
+	require.True(t, ok)
+	require.NotNil(t, op)
+	resolver := &typeResolver{ModelsPackage: b.ModelsPackage, Doc: b.Doc}
+	resolver.KnownDefs = make(map[string]struct{})
+	for k := range b.Doc.Spec().Definitions {
+		resolver.KnownDefs[k] = struct{}{}
+	}
+	for _, param := range op.Parameters {
+		if param.Name == "body" {
+			gp, perr := b.MakeParameter("a", resolver, param, nil)
+			require.NoError(t, perr)
+			assert.True(t, gp.IsBodyParam())
+			require.NotNil(t, gp.Schema)
+			assert.True(t, gp.Schema.IsComplexObject)
+			assert.False(t, gp.Schema.IsAnonymous)
+			assert.Equal(t, "models.Task", gp.Schema.GoType)
 		}
 	}
 
 	b, err = opBuilder("createTask", "../fixtures/codegen/todolist.bodyparams.yml")
-
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
+	require.NoError(t, err)
 
 	_, _, op, ok = b.Analyzed.OperationForName("createTask")
-	if assert.True(t, ok) && assert.NotNil(t, op) {
-		resolver := &typeResolver{ModelsPackage: b.ModelsPackage, Doc: b.Doc}
-		resolver.KnownDefs = make(map[string]struct{})
-		for k := range b.Doc.Spec().Definitions {
-			resolver.KnownDefs[k] = struct{}{}
-		}
-		for _, param := range op.Parameters {
-			if param.Name == "body" {
-				gp, err := b.MakeParameter("a", resolver, param, nil)
-				if assert.NoError(t, err) {
-					assert.True(t, gp.IsBodyParam())
-					if assert.NotNil(t, gp.Schema) {
-						assert.True(t, gp.Schema.IsComplexObject)
-						assert.False(t, gp.Schema.IsAnonymous)
-						assert.Equal(t, "CreateTaskBody", gp.Schema.GoType)
+	require.True(t, ok)
+	require.NotNil(t, op)
+	resolver = &typeResolver{ModelsPackage: b.ModelsPackage, Doc: b.Doc}
+	resolver.KnownDefs = make(map[string]struct{})
+	for k := range b.Doc.Spec().Definitions {
+		resolver.KnownDefs[k] = struct{}{}
+	}
+	for _, param := range op.Parameters {
+		if param.Name == "body" {
+			gp, err := b.MakeParameter("a", resolver, param, nil)
+			require.NoError(t, err)
+			assert.True(t, gp.IsBodyParam())
+			require.NotNil(t, gp.Schema)
+			assert.True(t, gp.Schema.IsComplexObject)
+			assert.False(t, gp.Schema.IsAnonymous)
+			assert.Equal(t, "CreateTaskBody", gp.Schema.GoType)
 
-						gpe, ok := b.ExtraSchemas["CreateTaskBody"]
-						assert.True(t, ok)
-						assert.True(t, gpe.IsComplexObject)
-						assert.False(t, gpe.IsAnonymous)
-						assert.Equal(t, "CreateTaskBody", gpe.GoType)
-					}
-				}
-			}
+			gpe, ok := b.ExtraSchemas["CreateTaskBody"]
+			assert.True(t, ok)
+			assert.True(t, gpe.IsComplexObject)
+			assert.False(t, gpe.IsAnonymous)
+			assert.Equal(t, "CreateTaskBody", gpe.GoType)
 		}
 	}
 }
@@ -108,16 +100,11 @@ var arrayFormParams = []paramTestContext{
 
 func TestFormArrayParams(t *testing.T) {
 	b, err := opBuilder("arrayFormParams", "../fixtures/codegen/todolist.arrayform.yml")
-
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
+	require.NoError(t, err)
 
 	for _, v := range arrayFormParams {
 		v.B = b
-		if !v.assertParameter(t) {
-			t.FailNow()
-		}
+		require.True(t, v.assertParameter(t))
 	}
 }
 
@@ -135,16 +122,11 @@ var arrayQueryParams = []paramTestContext{
 
 func TestQueryArrayParams(t *testing.T) {
 	b, err := opBuilder("arrayQueryParams", "../fixtures/codegen/todolist.arrayquery.yml")
-
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
+	require.NoError(t, err)
 
 	for _, v := range arrayQueryParams {
 		v.B = b
-		if !v.assertParameter(t) {
-			t.FailNow()
-		}
+		require.True(t, v.assertParameter(t))
 	}
 }
 
@@ -161,15 +143,11 @@ var simplePathParams = []paramTestContext{
 
 func TestSimplePathParams(t *testing.T) {
 	b, err := opBuilder("simplePathParams", "../fixtures/codegen/todolist.simplepath.yml")
+	require.NoError(t, err)
 
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
 	for _, v := range simplePathParams {
 		v.B = b
-		if !v.assertParameter(t) {
-			t.FailNow()
-		}
+		require.True(t, v.assertParameter(t))
 	}
 }
 
@@ -187,15 +165,11 @@ var simpleHeaderParams = []paramTestContext{
 
 func TestSimpleHeaderParams(t *testing.T) {
 	b, err := opBuilder("simpleHeaderParams", "../fixtures/codegen/todolist.simpleheader.yml")
+	require.NoError(t, err)
 
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
 	for _, v := range simpleHeaderParams {
 		v.B = b
-		if !v.assertParameter(t) {
-			t.FailNow()
-		}
+		require.True(t, v.assertParameter(t))
 	}
 }
 
@@ -213,15 +187,11 @@ var simpleFormParams = []paramTestContext{
 
 func TestSimpleFormParams(t *testing.T) {
 	b, err := opBuilder("simpleFormParams", "../fixtures/codegen/todolist.simpleform.yml")
+	require.NoError(t, err)
 
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
 	for _, v := range simpleFormParams {
 		v.B = b
-		if !v.assertParameter(t) {
-			t.FailNow()
-		}
+		require.True(t, v.assertParameter(t))
 	}
 }
 
@@ -239,15 +209,11 @@ var simpleQueryParams = []paramTestContext{
 
 func TestSimpleQueryParamsAST(t *testing.T) {
 	b, err := opBuilder("simpleQueryParams", "../fixtures/codegen/todolist.simplequery.yml")
+	require.NoError(t, err)
 
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
 	for _, v := range simpleQueryParams {
 		v.B = b
-		if !v.assertParameter(t) {
-			t.FailNow()
-		}
+		require.True(t, v.assertParameter(t))
 	}
 }
 
@@ -460,14 +426,10 @@ func TestGenParameters_Simple(t *testing.T) {
 	}()
 
 	b, err := opBuilder("getSearch", "../fixtures/bugs/163/swagger.yml")
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
+	require.NoError(t, err)
 	for _, v := range bug163Properties {
 		v.B = b
-		if !v.assertParameter(t) {
-			t.FailNow()
-		}
+		require.True(t, v.assertParameter(t))
 	}
 }
 
@@ -478,25 +440,22 @@ func TestGenParameter_Issue163(t *testing.T) {
 	}()
 
 	b, err := opBuilder("getSearch", "../fixtures/bugs/163/swagger.yml")
-	if assert.NoError(t, err) {
-		op, err := b.MakeOperation()
-		if assert.NoError(t, err) {
-			buf := bytes.NewBuffer(nil)
-			opts := opts()
-			err := templates.MustGet("serverParameter").Execute(buf, op)
-			if assert.NoError(t, err) {
-				ff, err := opts.LanguageOpts.FormatContent("get_search_parameters.go", buf.Bytes())
-				if assert.NoError(t, err) {
-					res := string(ff)
-					// NOTE(fredbi): removed default values resolution from private details (defaults are resolved in NewXXXParams())
-					assertInCode(t, "stringTypeInQueryDefault = string(\"qsValue\")", res)
-					assertInCode(t, "StringTypeInQuery: &stringTypeInQueryDefault", res)
-				} else {
-					fmt.Println(buf.String())
-				}
-			}
-		}
+	require.NoError(t, err)
+	op, err := b.MakeOperation()
+	require.NoError(t, err)
+	buf := bytes.NewBuffer(nil)
+	opts := opts()
+	err = templates.MustGet("serverParameter").Execute(buf, op)
+	require.NoError(t, err)
+	ff, err := opts.LanguageOpts.FormatContent("get_search_parameters.go", buf.Bytes())
+	if err != nil {
+		fmt.Println(buf.String())
 	}
+	require.NoError(t, err)
+	res := string(ff)
+	// NOTE(fredbi): removed default values resolution from private details (defaults are resolved in NewXXXParams())
+	assertInCode(t, "stringTypeInQueryDefault = string(\"qsValue\")", res)
+	assertInCode(t, "StringTypeInQuery: &stringTypeInQueryDefault", res)
 }
 
 func TestGenParameter_Issue195(t *testing.T) {
@@ -617,6 +576,51 @@ func TestGenParameter_Issue248(t *testing.T) {
 					assertInCode(t, ", *o.OptionalQueryEnum", res)
 				} else {
 					fmt.Println(buf.String())
+				}
+			}
+		}
+	}
+}
+
+func TestGenParameter_Issue303(t *testing.T) {
+	services := map[string][]string{
+		"giveFruit": {
+			`	if err := validate.EnumCase("fruit", "query", o.Fruit, []interface{}{"Apple", "Pear", "Plum"}, false); err != nil {`,
+		},
+		"giveFruitBasket": {
+			`		if err := validate.EnumCase(fmt.Sprintf("%s.%v", "fruit", i), "query", fruitIIC, []interface{}{[]interface{}{"Strawberry", "Raspberry"}, []interface{}{"Blueberry", "Cranberry"}}, false); err != nil {`,
+			`				if err := validate.EnumCase(fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", "fruit", i), ii), "query", fruitII, []interface{}{"Peach", "Apricot"}, false); err != nil {`,
+			`	if err := validate.EnumCase("fruit", "query", o.Fruit, []interface{}{[]interface{}{[]interface{}{"Banana", "Pineapple"}}, []interface{}{[]interface{}{"Orange", "Grapefruit"}, []interface{}{"Lemon", "Lime"}}}, false); err != nil {`,
+		},
+	}
+
+	for service, codelines := range services {
+		gen, err := opBuilder(service, "../fixtures/enhancements/303/swagger.yml")
+		if assert.NoError(t, err) {
+			op, err := gen.MakeOperation()
+			if assert.NoError(t, err) {
+				param := op.Params[0]
+				assert.Equal(t, "fruit", param.Name)
+				assert.True(t, param.IsEnumCI)
+				extension := param.Extensions["x-go-enum-ci"]
+				assert.NotNil(t, extension)
+				xGoEnumCI, ok := extension.(bool)
+				assert.True(t, ok)
+				assert.True(t, xGoEnumCI)
+
+				buf := bytes.NewBuffer(nil)
+				err = templates.MustGet("serverParameter").Execute(buf, op)
+				if assert.NoError(t, err) {
+					opts := opts()
+					ff, err := opts.LanguageOpts.FormatContent("case_insensitive_enum_parameter.go", buf.Bytes())
+					if assert.NoError(t, err) {
+						res := string(ff)
+						for _, codeline := range codelines {
+							assertInCode(t, codeline, res)
+						}
+					} else {
+						fmt.Println(buf.String())
+					}
 				}
 			}
 		}
@@ -931,29 +935,24 @@ func TestGenParameter_Issue710(t *testing.T) {
 }
 
 func TestGenParameter_Issue776_LocalFileRef(t *testing.T) {
-	//spec.Debug = true
 	log.SetOutput(ioutil.Discard)
 	defer func() {
-		//spec.Debug = false
 		log.SetOutput(os.Stdout)
 	}()
 	b, err := opBuilderWithFlatten("GetItem", "../fixtures/bugs/776/param.yaml")
-	if assert.NoError(t, err) {
-		op, err := b.MakeOperation()
-		if assert.NoError(t, err) {
-			var buf bytes.Buffer
-			opts := opts()
-			if assert.NoError(t, templates.MustGet("serverParameter").Execute(&buf, op)) {
-				ff, err := opts.LanguageOpts.FormatContent("do_empty_responses.go", buf.Bytes())
-				if assert.NoError(t, err) {
-					assertInCode(t, "Body *models.Item", string(ff))
-					assertNotInCode(t, "type GetItemParamsBody struct", string(ff))
-				} else {
-					fmt.Println(buf.String())
-				}
-			}
-		}
+	require.NoError(t, err)
+	op, err := b.MakeOperation()
+	require.NoError(t, err)
+	var buf bytes.Buffer
+	opts := opts()
+	require.NoError(t, templates.MustGet("serverParameter").Execute(&buf, op))
+	ff, err := opts.LanguageOpts.FormatContent("do_empty_responses.go", buf.Bytes())
+	if err != nil {
+		fmt.Println(buf.String())
 	}
+	require.NoError(t, err)
+	assertInCode(t, "Body *models.Item", string(ff))
+	assertNotInCode(t, "type GetItemParamsBody struct", string(ff))
 
 }
 
@@ -1259,7 +1258,7 @@ func TestGenParameter_Issue909(t *testing.T) {
 		"1": { // fixture index
 			"serverParameter": { // executed template
 				// expected code lines
-				`strfmt "github.com/go-openapi/strfmt"`,
+				`"github.com/go-openapi/strfmt"`,
 				`NotAnOption1 *strfmt.DateTime`,
 				`NotAnOption2 *strfmt.UUID`,
 				`NotAnOption3 *models.ContainerConfig`,
@@ -1304,7 +1303,7 @@ func TestGenParameter_Issue909(t *testing.T) {
 			"serverParameter": {
 				// expected code lines
 				`"github.com/go-openapi/validate"`,
-				`strfmt "github.com/go-openapi/strfmt"`,
+				`"github.com/go-openapi/strfmt"`,
 				`IsAnOption2 [][]strfmt.UUID`,
 				`IsAnOption4 [][][]strfmt.UUID`,
 				`IsAnOptionalHeader [][]strfmt.UUID`,
@@ -1336,7 +1335,7 @@ func TestGenParameter_Issue909(t *testing.T) {
 				`for iii, isAnOption4IIIV := range isAnOption4IIIC {`,
 				`value, err := formats.Parse("uuid", isAnOption4IIIV)`,
 				`isAnOption4III := *(value.(*strfmt.UUID))`,
-				`if err := validate.Enum(fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", "isAnOption4", i), ii), iii), "query", isAnOption4III.String(), []interface{}{"a", "b", "c"}); err != nil {`,
+				`if err := validate.EnumCase(fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", "isAnOption4", i), ii), iii), "query", isAnOption4III.String(), []interface{}{"a", "b", "c"}, true); err != nil {`,
 				`if err := validate.FormatOf(fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", "isAnOption4", i), ii), iii), "query", "uuid", isAnOption4III.String(), formats); err != nil {`,
 				`isAnOption4IIIR = append(isAnOption4IIIR, isAnOption4III)`,
 				`isAnOption4IIR = append(isAnOption4IIR, isAnOption4IIIR)`,
@@ -1382,7 +1381,7 @@ func TestGenParameter_Issue909(t *testing.T) {
 			"serverParameter": {
 				// expected code lines
 				`"github.com/go-openapi/validate"`,
-				`strfmt "github.com/go-openapi/strfmt"`,
+				`"github.com/go-openapi/strfmt"`,
 				`IsAnOption2 [][]strfmt.UUID`,
 				`IsAnOption4 [][][]strfmt.UUID`,
 				`NotAnOption1 [][]strfmt.DateTime`,
@@ -1413,7 +1412,7 @@ func TestGenParameter_Issue909(t *testing.T) {
 				`for iii, isAnOption4IIIV := range isAnOption4IIIC {`,
 				`value, err := formats.Parse("uuid", isAnOption4IIIV)`,
 				`isAnOption4III := *(value.(*strfmt.UUID))`,
-				`if err := validate.Enum(fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", "isAnOption4", i), ii), iii), "query", isAnOption4III.String(), []interface{}{"a", "b", "c"}); err != nil {`,
+				`if err := validate.EnumCase(fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", "isAnOption4", i), ii), iii), "query", isAnOption4III.String(), []interface{}{"a", "b", "c"}, true); err != nil {`,
 				`if err := validate.FormatOf(fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", "isAnOption4", i), ii), iii), "query", "uuid", isAnOption4III.String(), formats); err != nil {`,
 				`isAnOption4IIIR = append(isAnOption4IIIR, isAnOption4III)`,
 				`isAnOption4IIR = append(isAnOption4IIR, isAnOption4IIIR)`,
@@ -1659,7 +1658,7 @@ func TestGenParameter_Issue1392(t *testing.T) {
 				`		return errors.CompositeValidationError(res...)`,
 				`	return nil`,
 				`func (o *PostBodybuilder26Params) validateMyObjectBody(formats strfmt.Registry) error {`,
-				`	if err := validate.Enum("myObject", "body", o.MyObject.String(), []interface{}{"1992-01-01", "2012-01-01"}); err != nil {`,
+				`	if err := validate.EnumCase("myObject", "body", o.MyObject.String(), []interface{}{"1992-01-01", "2012-01-01"}, true); err != nil {`,
 				`	if err := validate.FormatOf("myObject", "body", "date", o.MyObject.String(), formats); err != nil {`,
 			},
 		},
@@ -1681,7 +1680,8 @@ func TestGenParameter_Issue1392(t *testing.T) {
 				`	if len(res) > 0 {`,
 				`		return errors.CompositeValidationError(res...)`,
 				`func (o *PostBodybuilder27Params) validateMyObjectBody(formats strfmt.Registry) error {`,
-				`	if err := validate.Enum("myObject", "body", o.MyObject, []interface{}{[]interface{}{[]interface{}{"1992-01-01", "2012-01-01"}}}); err != nil {`,
+				`	if err := validate.EnumCase("myObject", "body", o.MyObject, []interface{}{[]interface{}{[]interface{}{"1992-01-01", "2012-01-01"}}},`,
+				`		true); err != nil {`,
 				`		return err`,
 				`	myObjectIC := o.MyObject`,
 				`	var myObjectIR [][]strfmt.Date`,
@@ -1691,14 +1691,15 @@ func TestGenParameter_Issue1392(t *testing.T) {
 				`			var myObjectIIR []strfmt.Date`,
 				`			for ii, myObjectIIV := range myObjectIIC {`,
 				`				myObjectII := myObjectIIV`,
-				`				if err := validate.Enum(fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", "myObject", i), ii), "", myObjectII.String(), []interface{}{"1992-01-01", "2012-01-01"}); err != nil {`,
+				`				if err := validate.EnumCase(fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", "myObject", i), ii), "", myObjectII.String(), []interface{}{"1992-01-01", "2012-01-01"}, true); err != nil {`,
 				`					return err`,
 				`				if err := validate.FormatOf(fmt.Sprintf("%s.%v", fmt.Sprintf("%s.%v", "myObject", i), ii), "", "date", myObjectII.String(), formats); err != nil {`,
 				`					return err`,
 				`				myObjectIIR = append(myObjectIIR, myObjectII)`,
 				`			myObjectIR = append(myObjectIR, myObjectIIR)`,
 				// fixed missing enum validation
-				`		if err := validate.Enum(fmt.Sprintf("%s.%v", "myObject", i), "body", myObjectIIC, []interface{}{[]interface{}{"1992-01-01", "2012-01-01"}}); err != nil {`,
+				`		if err := validate.EnumCase(fmt.Sprintf("%s.%v", "myObject", i), "body", myObjectIIC, []interface{}{[]interface{}{"1992-01-01", "2012-01-01"}},`,
+				`			true); err != nil {`,
 				`	o.MyObject = myObjectIR`,
 			},
 		},
@@ -2247,7 +2248,8 @@ func TestGenParameter_Issue15362(t *testing.T) {
 				`			if err := o.validateSimpleArrayWithSliceValidationBody(route.Formats); err != nil {`,
 				`		return errors.CompositeValidationError(res...`,
 				`func (o *GetSimpleArrayWithSliceValidationParams) validateSimpleArrayWithSliceValidationBody(formats strfmt.Registry) error {`,
-				`	if err := validate.Enum("simpleArrayWithSliceValidation", "body", o.SimpleArrayWithSliceValidation, []interface{}{[]interface{}{1, 2, 3}, []interface{}{4, 5, 6}}); err != nil {`,
+				`	if err := validate.EnumCase("simpleArrayWithSliceValidation", "body", o.SimpleArrayWithSliceValidation, []interface{}{[]interface{}{1, 2, 3}, []interface{}{4, 5, 6}},`,
+				`		true); err != nil {`,
 			},
 		},
 
@@ -4071,8 +4073,6 @@ func TestGenParameter_Issue1548_base64(t *testing.T) {
 				`		if err := route.Consumer.Consume(r.Body, &body); err != nil {`,
 				`			res = append(res, errors.NewParseError("data", "body", "", err)`,
 				`		} else {`,
-				`			o.Data = body`,
-				`			if err := o.validateDataBody(route.Formats); err != nil {`,
 				`		return errors.CompositeValidationError(res...`,
 				`func (o *MyMethodParams) bindByteInQuery(rawData []string, hasKey bool, formats strfmt.Registry) error {`,
 				`	if !hasKey {`,
@@ -4088,7 +4088,6 @@ func TestGenParameter_Issue1548_base64(t *testing.T) {
 				`	if err := o.validateByteInQuery(formats); err != nil {`,
 				`func (o *MyMethodParams) validateByteInQuery(formats strfmt.Registry) error {`,
 				`	if err := validate.MaxLength("byteInQuery", "query", o.ByteInQuery.String(), 100); err != nil {`,
-				`func (o *MyMethodParams) validateDataBody(formats strfmt.Registry) error {`,
 			},
 		},
 
@@ -4406,4 +4405,53 @@ func TestGenClientParameter_1937(t *testing.T) {
 		},
 	}
 	assertParams(t, fixtureConfig, filepath.Join("..", "fixtures", "bugs", "1937", "fixture-1937.yaml"), true, false)
+}
+
+func TestGenParameter_Issue2167(t *testing.T) {
+	assert := assert.New(t)
+
+	gen, err := opBuilder("xGoNameInParams", "../fixtures/enhancements/2167/swagger.yml")
+	if assert.NoError(err) {
+		op, err := gen.MakeOperation()
+		if assert.NoError(err) {
+			buf := bytes.NewBuffer(nil)
+			opts := opts()
+			err := templates.MustGet("clientParameter").Execute(buf, op)
+			if assert.NoError(err) {
+				ff, err := opts.LanguageOpts.FormatContent("x_go_name_in_params_parameters.go", buf.Bytes())
+				if assert.NoError(err) {
+					res := string(ff)
+					assertRegexpInCode(t, `(?m)^\tMyPathName\s+string$`, res)
+					assertRegexpInCode(t, `(?m)^\tTestRegion\s+string$`, res)
+					assertRegexpInCode(t, `(?m)^\tMyQueryCount\s+\*int64$`, res)
+					assertRegexpInCode(t, `(?m)^\tTestLimit\s+\*int64$`, res)
+				} else {
+					fmt.Println(buf.String())
+				}
+			}
+		}
+	}
+}
+func TestGenParameter_Issue2273(t *testing.T) {
+	assert := assert.New(t)
+
+	gen, err := opBuilder("postSnapshot", "../fixtures/bugs/2273/swagger.json")
+	if assert.NoError(err) {
+		op, err := gen.MakeOperation()
+		if assert.NoError(err) {
+			buf := bytes.NewBuffer(nil)
+			opts := opts()
+			err := templates.MustGet("serverParameter").Execute(buf, op)
+			if assert.NoError(err) {
+				ff, err := opts.LanguageOpts.FormatContent("post_snapshot_parameters.go", buf.Bytes())
+				if assert.NoError(err) {
+					res := string(ff)
+					fmt.Println(res)
+					assertInCode(t, "o.Snapshot = *(value.(*io.ReadCloser))", res)
+				} else {
+					fmt.Println(buf.String())
+				}
+			}
+		}
+	}
 }

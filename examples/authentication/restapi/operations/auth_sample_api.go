@@ -35,6 +35,7 @@ func NewAuthSampleAPI(spec *loads.Document) *AuthSampleAPI {
 		PreServerShutdown:   func() {},
 		ServerShutdown:      func() {},
 		spec:                spec,
+		useSwaggerUI:        false,
 		ServeError:          errors.ServeError,
 		BasicAuthenticator:  security.BasicAuth,
 		APIKeyAuthenticator: security.APIKeyAuth,
@@ -71,13 +72,16 @@ type AuthSampleAPI struct {
 	defaultConsumes string
 	defaultProduces string
 	Middleware      func(middleware.Builder) http.Handler
+	useSwaggerUI    bool
 
 	// BasicAuthenticator generates a runtime.Authenticator from the supplied basic auth function.
 	// It has a default implementation in the security package, however you can replace it for your particular usage.
 	BasicAuthenticator func(security.UserPassAuthentication) runtime.Authenticator
+
 	// APIKeyAuthenticator generates a runtime.Authenticator from the supplied token auth function.
 	// It has a default implementation in the security package, however you can replace it for your particular usage.
 	APIKeyAuthenticator func(string, string, security.TokenAuthentication) runtime.Authenticator
+
 	// BearerAuthenticator generates a runtime.Authenticator from the supplied bearer token auth function.
 	// It has a default implementation in the security package, however you can replace it for your particular usage.
 	BearerAuthenticator func(string, security.ScopedTokenAuthentication) runtime.Authenticator
@@ -101,6 +105,7 @@ type AuthSampleAPI struct {
 	CustomersCreateHandler customers.CreateHandler
 	// CustomersGetIDHandler sets the operation handler for the get Id operation
 	CustomersGetIDHandler customers.GetIDHandler
+
 	// ServeError is called when an error is received, there is a default handler
 	// but you can set your own with this
 	ServeError func(http.ResponseWriter, *http.Request, error)
@@ -118,6 +123,16 @@ type AuthSampleAPI struct {
 
 	// User defined logger function.
 	Logger func(string, ...interface{})
+}
+
+// UseRedoc for documentation at /docs
+func (o *AuthSampleAPI) UseRedoc() {
+	o.useSwaggerUI = false
+}
+
+// UseSwaggerUI for documentation at /docs
+func (o *AuthSampleAPI) UseSwaggerUI() {
+	o.useSwaggerUI = true
 }
 
 // SetDefaultProduces sets the default produces media type
@@ -294,6 +309,9 @@ func (o *AuthSampleAPI) Serve(builder middleware.Builder) http.Handler {
 	if o.Middleware != nil {
 		return o.Middleware(builder)
 	}
+	if o.useSwaggerUI {
+		return o.context.APIHandlerSwaggerUI(builder)
+	}
 	return o.context.APIHandler(builder)
 }
 
@@ -312,4 +330,16 @@ func (o *AuthSampleAPI) RegisterConsumer(mediaType string, consumer runtime.Cons
 // RegisterProducer allows you to add (or override) a producer for a media type.
 func (o *AuthSampleAPI) RegisterProducer(mediaType string, producer runtime.Producer) {
 	o.customProducers[mediaType] = producer
+}
+
+// AddMiddlewareFor adds a http middleware to existing handler
+func (o *AuthSampleAPI) AddMiddlewareFor(method, path string, builder middleware.Builder) {
+	um := strings.ToUpper(method)
+	if path == "/" {
+		path = ""
+	}
+	o.Init()
+	if h, ok := o.handlers[um][path]; ok {
+		o.handlers[method][path] = builder(h)
+	}
 }

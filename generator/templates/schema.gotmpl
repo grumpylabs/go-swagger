@@ -5,6 +5,8 @@
   {{- if .IsBaseType }}
     {{ template "baseTypeSerializer" . }}{{/* When the alias redeclares a polymorphic type, define factory methods with this alias. */}}
   {{- end }}
+{{- else if .IsEmbedded }}
+  {{- template "schemaEmbedded" . }}
 {{- else }}
   {{- if or .IsComplexObject .IsTuple .IsAdditionalProperties }}{{/* TODO(fred): handle case of subtype inheriting from base type with AdditionalProperties, issue #2220 */}}
       {{ if .Name }}type {{ if not .IsExported }}{{ .Name }}{{ else }}{{ pascalize .Name }}{{ end }}{{ end }} {{ template "schemaBody" . }}
@@ -74,12 +76,30 @@
   {{- end }}
   {{ template "schemaSerializer" . }}
 {{- end }}
-{{- if and .IncludeValidator (not .IsSuperAlias) }}{{/* aliased types type A = B do not redefine methods */}}
+{{- if and .IncludeValidator (not .IsSuperAlias) (not .IsEmbedded) }}{{/* aliased types type A = B do not redefine methods */}}
   {{- if and (not (or .IsInterface .IsStream)) (or .Required .HasValidations .HasBaseType) }}
+    {{- if (eq .SwaggerType "string") }}{{/* Enum factory for enums for which we generate const (atm, only strings)*/}}
+      {{- if .Enum }}
+
+func New{{ pascalize .Name }}(value {{ .GoType }}) *{{ .GoType }} {
+  v := value
+  return &v
+}
+      {{- end }}
+    {{- end }}
     {{ template "schemavalidator" . }}
   {{- else if not (or .IsInterface .IsStream) }}
 // Validate validates this {{ humanize .Name }}{{/* this schema implements the runtime.Validatable interface but has no validations to check */}}
 func ({{.ReceiverName}} {{ if or .IsTuple .IsComplexObject .IsAdditionalProperties }}*{{ end }}{{ if or (not .IsExported) .Discriminates }}{{ camelize .Name }}{{ else }}{{ pascalize .Name }}{{ end }}) Validate(formats strfmt.Registry) error {
+  return nil
+}
+  {{- else }}{{/* {{ .Name }} does not implement the runtime.Validatable interface: noop */}}
+  {{- end }}
+  {{- if and (not (or .IsInterface .IsStream)) (or .HasContextValidations) }}
+    {{ template "schemacontextvalidator" . }}
+  {{- else if not (or .IsInterface .IsStream) }}
+// ContextValidate validates this {{ humanize .Name }} based on context it is used {{/* this schema implements the runtime.ContextValidatable interface but has no validations to check */}}
+func ({{.ReceiverName}} {{ if or .IsTuple .IsComplexObject .IsAdditionalProperties }}*{{ end }}{{ if or (not .IsExported) .Discriminates }}{{ camelize .Name }}{{ else }}{{ pascalize .Name }}{{ end }}) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
   return nil
 }
   {{- else }}{{/* {{ .Name }} does not implement the runtime.Validatable interface: noop */}}

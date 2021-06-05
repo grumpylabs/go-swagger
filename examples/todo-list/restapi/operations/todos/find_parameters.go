@@ -17,8 +17,16 @@ import (
 	"github.com/go-openapi/validate"
 )
 
+// FindMaxParseMemory sets the maximum size in bytes for
+// the multipart form parser for this operation.
+//
+// The default value is 32 MB.
+// The multipart parser stores up to this + 10MB.
+var FindMaxParseMemory int64 = 32 << 20
+
 // NewFindParams creates a new FindParams object
-// no default values defined in spec.
+//
+// There are no default values defined in the spec.
 func NewFindParams() FindParams {
 
 	return FindParams{}
@@ -60,7 +68,7 @@ func (o *FindParams) BindRequest(r *http.Request, route *middleware.MatchedRoute
 
 	o.HTTPRequest = r
 
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
+	if err := r.ParseMultipartForm(FindMaxParseMemory); err != nil {
 		if err != http.ErrNotMultipart {
 			return errors.New(400, "%v", err)
 		} else if err := r.ParseForm(); err != nil {
@@ -82,7 +90,6 @@ func (o *FindParams) BindRequest(r *http.Request, route *middleware.MatchedRoute
 	if err := o.bindTags(fdTags, fdhkTags, route.Formats); err != nil {
 		res = append(res, err)
 	}
-
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
@@ -92,7 +99,7 @@ func (o *FindParams) BindRequest(r *http.Request, route *middleware.MatchedRoute
 // bindXRateLimit binds and validates parameter XRateLimit from header.
 func (o *FindParams) bindXRateLimit(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	if !hasKey {
-		return errors.Required("X-Rate-Limit", "header")
+		return errors.Required("X-Rate-Limit", "header", rawData)
 	}
 	var raw string
 	if len(rawData) > 0 {
@@ -117,7 +124,7 @@ func (o *FindParams) bindXRateLimit(rawData []string, hasKey bool, formats strfm
 // bindLimit binds and validates parameter Limit from formData.
 func (o *FindParams) bindLimit(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	if !hasKey {
-		return errors.Required("limit", "formData")
+		return errors.Required("limit", "formData", rawData)
 	}
 	var raw string
 	if len(rawData) > 0 {
@@ -144,12 +151,10 @@ func (o *FindParams) bindLimit(rawData []string, hasKey bool, formats strfmt.Reg
 // Arrays are parsed according to CollectionFormat: "multi" (defaults to "csv" when empty).
 func (o *FindParams) bindTags(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	if !hasKey {
-		return errors.Required("tags", "formData")
+		return errors.Required("tags", "formData", rawData)
 	}
-
 	// CollectionFormat: multi
 	tagsIC := rawData
-
 	if len(tagsIC) == 0 {
 		return nil
 	}

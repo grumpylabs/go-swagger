@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/go-openapi/analysis"
 	"github.com/go-openapi/loads"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -130,7 +131,7 @@ func TestShared_CheckOpts(t *testing.T) {
 
 func TestShared_EnsureDefaults(t *testing.T) {
 	opts := &GenOpts{}
-	_ = opts.EnsureDefaults()
+	require.NoError(t, opts.EnsureDefaults())
 	assert.True(t, opts.defaultsEnsured)
 	opts.DefaultConsumes = "https"
 	_ = opts.EnsureDefaults()
@@ -275,7 +276,7 @@ func TestShared_NotFoundTemplate(t *testing.T) {
 	log.SetOutput(ioutil.Discard)
 	defer log.SetOutput(os.Stdout)
 
-	opts := GenOpts{}
+	opts := testGenOpts()
 	tplOpts := TemplateOpts{
 		Name:       "NotFound",
 		Source:     "asset:notfound",
@@ -286,8 +287,8 @@ func TestShared_NotFoundTemplate(t *testing.T) {
 	}
 
 	buf, err := opts.render(&tplOpts, nil)
-	assert.Error(t, err, "Error should be handled here")
-	assert.Nil(t, buf, "Upon error, GenOpts.render() should return nil buffer")
+	require.Errorf(t, err, "Error should be handled here")
+	assert.Nilf(t, buf, "Upon error, GenOpts.render() should return nil buffer")
 }
 
 // Low level testing: invalid template => Get() returns not found (higher level calls raise panic(), see above)
@@ -299,7 +300,8 @@ func TestShared_GarbledTemplate(t *testing.T) {
 	garbled := "func x {{;;; garbled"
 
 	_ = templates.AddFile("garbled", garbled)
-	opts := GenOpts{}
+	opts := testGenOpts()
+
 	tplOpts := TemplateOpts{
 		Name:       "Garbled",
 		Source:     "asset:garbled",
@@ -310,8 +312,8 @@ func TestShared_GarbledTemplate(t *testing.T) {
 	}
 
 	buf, err := opts.render(&tplOpts, nil)
-	assert.Error(t, err, "Error should be handled here")
-	assert.Nil(t, buf, "Upon error, GenOpts.render() should return nil buffer")
+	require.Errorf(t, err, "Error should be handled here")
+	assert.Nilf(t, buf, "Upon error, GenOpts.render() should return nil buffer")
 }
 
 // Template execution failure
@@ -330,7 +332,8 @@ func TestShared_ExecTemplate(t *testing.T) {
 	execfailure1 := "func x {{ .NotInData }}"
 
 	_ = templates.AddFile("execfailure1", execfailure1)
-	opts := new(GenOpts)
+	opts := testGenOpts()
+
 	tplOpts := TemplateOpts{
 		Name:       "execFailure1",
 		Source:     "asset:execfailure1",
@@ -347,7 +350,7 @@ func TestShared_ExecTemplate(t *testing.T) {
 	execfailure2 := "func {{ .MyFaultyMethod }}"
 
 	_ = templates.AddFile("execfailure2", execfailure2)
-	opts = new(GenOpts)
+	opts = testGenOpts()
 	tplOpts2 := TemplateOpts{
 		Name:       "execFailure2",
 		Source:     "asset:execfailure2",
@@ -381,7 +384,7 @@ func TestShared_BadFormatTemplate(t *testing.T) {
 	Debug = true
 	_ = templates.AddFile("badformat", badFormat)
 
-	opts := GenOpts{}
+	opts := testGenOpts()
 	opts.LanguageOpts = GoLangOpts()
 	tplOpts := TemplateOpts{
 		Name:   "badformat",
@@ -399,17 +402,19 @@ func TestShared_BadFormatTemplate(t *testing.T) {
 	}
 
 	err := opts.write(&tplOpts, data)
+	defer func() {
+		_ = os.Remove(tplOpts.FileName)
+	}()
 
 	// The badly formatted file has been dumped for debugging purposes
 	_, exists := os.Stat(tplOpts.FileName)
 	assert.True(t, !os.IsNotExist(exists), "The template file has not been generated as expected")
-	_ = os.Remove(tplOpts.FileName)
 
-	assert.NotNil(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "source formatting on generated source")
 
 	// Skipping format
-	opts = GenOpts{}
+	opts = testGenOpts()
 	opts.LanguageOpts = GoLangOpts()
 	tplOpts2 := TemplateOpts{
 		Name:       "badformat2",
@@ -446,7 +451,7 @@ func TestShared_DirectoryTemplate(t *testing.T) {
 
 	_ = templates.AddFile("gendir", content)
 
-	opts := GenOpts{}
+	opts := testGenOpts()
 	opts.LanguageOpts = GoLangOpts()
 	tplOpts := TemplateOpts{
 		Name:   "gendir",
@@ -479,7 +484,7 @@ func TestShared_LoadTemplate(t *testing.T) {
 	log.SetOutput(ioutil.Discard)
 	defer log.SetOutput(os.Stdout)
 
-	opts := GenOpts{}
+	opts := testGenOpts()
 	tplOpts := TemplateOpts{
 		Name:       "File",
 		Source:     "File",
@@ -508,9 +513,35 @@ func TestShared_AppNameOrDefault(t *testing.T) {
 	specPath := filepath.Join("..", "fixtures", "codegen", "shipyard.yml")
 	specDoc, err := loads.Spec(specPath)
 	require.NoError(t, err)
+
 	require.NotNil(t, specDoc.Spec().Info)
 	specDoc.Spec().Info.Title = "    "
 	assert.Equal(t, "Xyz", appNameOrDefault(specDoc, "  ", "xyz"))
+	specDoc.Spec().Info.Title = "test"
+	assert.Equal(t, "Xyz", appNameOrDefault(specDoc, "  ", "xyz"))
+
+	opts := testGenOpts()
+	opts.Spec = specPath
+	_, err = opts.validateAndFlattenSpec()
+	require.NoError(t, err)
+
+	// more aggressive fixture on $refs, with validation errors, but flatten ok
+	specPath = filepath.Join("..", "fixtures", "bugs", "1429", "swagger.yaml")
+	specDoc, err = loads.Spec(specPath)
+	require.NoError(t, err)
+
+	opts.Spec = specPath
+	opts.FlattenOpts.BasePath = specDoc.SpecFilePath()
+	opts.FlattenOpts.Spec = analysis.New(specDoc.Spec())
+	opts.FlattenOpts.Minimal = true
+	err = analysis.Flatten(*opts.FlattenOpts)
+	assert.NoError(t, err)
+
+	specDoc, _ = loads.Spec(specPath) // needs reload
+	opts.FlattenOpts.Spec = analysis.New(specDoc.Spec())
+	opts.FlattenOpts.Minimal = false
+	err = analysis.Flatten(*opts.FlattenOpts)
+	assert.NoError(t, err)
 }
 
 func TestShared_GatherModel(t *testing.T) {
@@ -559,4 +590,189 @@ func TestShared_DumpWrongData(t *testing.T) {
 		a: func() string { return "" },
 		B: "xyz",
 	}))
+}
+
+func TestResolvePrincipal(t *testing.T) {
+	for _, toPin := range []struct {
+		Title     string
+		Principal string
+		Expected  []string
+	}{
+		{
+			Title: "defaults", Principal: "",
+			Expected: []string{"", "interface{}", ""},
+		},
+		{
+			Title: "with base import", Principal: "auth.Principal",
+			Expected: []string{"auth", "auth.Principal", "auth"},
+		},
+		{
+			Title: "with full import", Principal: "github.com/myproject/auth.Principal",
+			Expected: []string{"auth", "auth.Principal", "github.com/myproject/auth"},
+		},
+		{
+			Title: "with name conflict", Principal: "github.com/myproject/middleware.Principal",
+			Expected: []string{"auth", "auth.Principal", "github.com/myproject/middleware"},
+		},
+		{
+			Title: "with name conflict (2)", Principal: "github.com/myproject/principal.Principal",
+			Expected: []string{"auth", "auth.Principal", "github.com/myproject/principal"},
+		},
+	} {
+		fixture := toPin
+		t.Run(fixture.Title, func(t *testing.T) {
+			t.Parallel()
+			opts := &GenOpts{Principal: fixture.Principal}
+			err := opts.EnsureDefaults()
+			require.NoError(t, err)
+			alias, principal, target := opts.resolvePrincipal()
+			require.Equal(t, fixture.Expected[0], alias)
+			require.Equal(t, fixture.Expected[1], principal)
+			require.Equal(t, fixture.Expected[2], target)
+		})
+	}
+}
+
+func TestDefaultImports(t *testing.T) {
+	for i, toPin := range []struct {
+		Title    string
+		Opts     *GenOpts
+		Expected map[string]string
+	}{
+		{
+			Title: "defaults",
+			Opts:  &GenOpts{},
+			Expected: map[string]string{
+				"models": "github.com/go-swagger/go-swagger/generator/models",
+			},
+		},
+		{
+			Title: "with base import",
+			Opts: &GenOpts{
+				Principal: "ext.Principal",
+			},
+			Expected: map[string]string{
+				"ext":    "github.com/go-swagger/go-swagger/generator/ext",
+				"models": "github.com/go-swagger/go-swagger/generator/models",
+			},
+		},
+		{
+			Title: "with full import",
+			Opts: &GenOpts{
+				Principal: "github.com/myproject/identity.Principal",
+			},
+			Expected: map[string]string{
+				"identity": "github.com/myproject/identity",
+				"models":   "github.com/go-swagger/go-swagger/generator/models",
+			},
+		},
+		{
+			Title: "with name conflict",
+			Opts: &GenOpts{
+				Principal: "github.com/myproject/middleware.Principal",
+			},
+			Expected: map[string]string{
+				"auth":   "github.com/myproject/middleware",
+				"models": "github.com/go-swagger/go-swagger/generator/models",
+			},
+		},
+		{
+			Title: "with name conflict (2)",
+			Opts: &GenOpts{
+				Principal: "github.com/myproject/principal.Principal",
+			},
+			Expected: map[string]string{
+				"auth":   "github.com/myproject/principal",
+				"models": "github.com/go-swagger/go-swagger/generator/models",
+			},
+		},
+		{
+			Title: "alternate target for models",
+			Opts: &GenOpts{
+				ModelPackage: "target/bespoke",
+			},
+			Expected: map[string]string{
+				"bespoke": "github.com/go-swagger/go-swagger/generator/target/bespoke",
+			},
+		},
+		{
+			Title: "with existing models",
+			Opts: &GenOpts{
+				ExistingModels: "github.com/myproject/target/bespoke",
+			},
+			Expected: map[string]string{
+				"models": "github.com/myproject/target/bespoke",
+			},
+		},
+		// issue #2362
+		{
+			Title: "relative principal, in dedicated package under generated target",
+			Opts: &GenOpts{
+				Principal:    "auth.Principal",
+				ModelPackage: "target/bespoke",
+			},
+			Expected: map[string]string{
+				"bespoke": "github.com/go-swagger/go-swagger/generator/target/bespoke",
+				"auth":    "github.com/go-swagger/go-swagger/generator/auth",
+			},
+		},
+		{
+			Title: "relative principal in models (1)",
+			Opts: &GenOpts{
+				Principal:    "bespoke.Principal",
+				ModelPackage: "target/bespoke",
+			},
+			Expected: map[string]string{
+				"bespoke": "github.com/go-swagger/go-swagger/generator/target/bespoke",
+			},
+		},
+		{
+			Title: "relative principal in models (2)",
+			Opts: &GenOpts{
+				Principal:    "target/bespoke.Principal",
+				ModelPackage: "target/bespoke",
+			},
+			Expected: map[string]string{
+				"bespoke": "github.com/go-swagger/go-swagger/generator/target/bespoke",
+			},
+		},
+		{
+			Title: "relative principal: not detected",
+			// NOTE: this case will probably not build: no way to determine the user intent
+			Opts: &GenOpts{
+				Principal:    "target/auth.Principal",
+				ModelPackage: "target/models",
+			},
+			Expected: map[string]string{
+				"models": "github.com/go-swagger/go-swagger/generator/target/models",
+				"auth":   "target/auth",
+			},
+		},
+	} {
+		fixture := toPin
+		t.Run(fixture.Title, func(t *testing.T) {
+			t.Parallel()
+			err := fixture.Opts.EnsureDefaults()
+			require.NoError(t, err)
+			imports := fixture.Opts.defaultImports()
+			require.EqualValuesf(t, fixture.Expected, imports, "unexpected imports generated with fixture %q[%d]", fixture.Title, i)
+		})
+	}
+}
+
+func TestShared_Issue2113(t *testing.T) {
+	log.SetOutput(ioutil.Discard)
+	defer log.SetOutput(os.Stdout)
+
+	// acknowledge fix in go-openapi/spec
+	specPath := filepath.Join("..", "fixtures", "bugs", "2113", "base.yaml")
+	_, err := loads.Spec(specPath)
+	require.NoError(t, err)
+
+	opts := testGenOpts()
+	opts.Spec = specPath
+	opts.Spec = specPath
+	opts.ValidateSpec = true
+	_, err = opts.validateAndFlattenSpec()
+	assert.NoError(t, err)
 }

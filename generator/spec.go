@@ -1,6 +1,7 @@
 package generator
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"github.com/go-openapi/analysis"
 	swaggererrors "github.com/go-openapi/errors"
 	"github.com/go-openapi/loads"
+	"github.com/go-openapi/spec"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 	"github.com/go-openapi/validate"
@@ -22,6 +24,14 @@ func (g *GenOpts) validateAndFlattenSpec() (*loads.Document, error) {
 	specDoc, err := loads.Spec(g.Spec)
 	if err != nil {
 		return nil, err
+	}
+
+	// If accepts definitions only, add dummy swagger header to pass validation
+	if g.AcceptDefinitionsOnly {
+		specDoc, err = applyDefaultSwagger(specDoc)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Validate if needed
@@ -109,7 +119,7 @@ func (g *GenOpts) printFlattenOpts() {
 	log.Printf("preprocessing spec with option:  %s", preprocessingOption)
 }
 
-//findSwaggerSpec fetches a default swagger spec if none is provided
+// findSwaggerSpec fetches a default swagger spec if none is provided
 func findSwaggerSpec(nm string) (string, error) {
 	specs := []string{"swagger.json", "swagger.yml", "swagger.yaml"}
 	if nm != "" {
@@ -158,7 +168,7 @@ func WithAutoXOrder(specPath string) string {
 			for i, prop := range props {
 				if pSlice, ok := prop.Value.(yaml.MapSlice); ok {
 					isObject := false
-					xOrderIndex := -1 //Find if x-order already exists
+					xOrderIndex := -1 // find if x-order already exists
 
 					for i, v := range pSlice {
 						if v.Key == "type" && v.Value == object {
@@ -170,7 +180,7 @@ func WithAutoXOrder(specPath string) string {
 						}
 					}
 
-					if xOrderIndex > -1 { //Override existing x-order
+					if xOrderIndex > -1 { // override existing x-order
 						pSlice[xOrderIndex] = yaml.MapItem{Key: xOrder, Value: i}
 					} else { // append new x-order
 						pSlice = append(pSlice, yaml.MapItem{Key: xOrder, Value: i})
@@ -212,4 +222,27 @@ func WithAutoXOrder(specPath string) string {
 		panic(err)
 	}
 	return tmpFile.Name()
+}
+
+func applyDefaultSwagger(doc *loads.Document) (*loads.Document, error) {
+	// bake a minimal swagger spec to pass validation
+	swspec := doc.Spec()
+	if swspec.Swagger == "" {
+		swspec.Swagger = "2.0"
+	}
+	if swspec.Info == nil {
+		info := new(spec.Info)
+		info.Version = "0.0.0"
+		info.Title = "minimal"
+		swspec.Info = info
+	}
+	if swspec.Paths == nil {
+		swspec.Paths = &spec.Paths{}
+	}
+	// rewrite the document with the new addition
+	jazon, err := json.Marshal(swspec)
+	if err != nil {
+		return nil, err
+	}
+	return loads.Analyzed(jazon, swspec.Swagger)
 }

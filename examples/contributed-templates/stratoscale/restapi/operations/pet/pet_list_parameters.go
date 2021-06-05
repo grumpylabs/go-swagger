@@ -17,7 +17,8 @@ import (
 )
 
 // NewPetListParams creates a new PetListParams object
-// no default values defined in spec.
+//
+// There are no default values defined in the spec.
 func NewPetListParams() PetListParams {
 
 	return PetListParams{}
@@ -55,7 +56,6 @@ func (o *PetListParams) BindRequest(r *http.Request, route *middleware.MatchedRo
 	if err := o.bindStatus(qStatus, qhkStatus, route.Formats); err != nil {
 		res = append(res, err)
 	}
-
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
@@ -67,14 +67,12 @@ func (o *PetListParams) BindRequest(r *http.Request, route *middleware.MatchedRo
 // Arrays are parsed according to CollectionFormat: "multi" (defaults to "csv" when empty).
 func (o *PetListParams) bindStatus(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	if !hasKey {
-		return errors.Required("status", "query")
+		return errors.Required("status", "query", rawData)
 	}
-
 	// CollectionFormat: multi
 	statusIC := rawData
-
 	if len(statusIC) == 0 {
-		return errors.Required("status", "query")
+		return errors.Required("status", "query", statusIC)
 	}
 
 	var statusIR []string

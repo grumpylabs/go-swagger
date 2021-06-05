@@ -25,6 +25,7 @@ it knows how to serialize and deserialize swagger specifications.
 
 * Generates a server from a swagger specification
 * Generates a client from a swagger specification
+* Generates a CLI (command line tool) from a swagger specification (alpha stage)
 * Supports most features offered by jsonschema and swagger, including polymorphism
 * Generates a swagger specification from annotated go code
 * Additional tools to work with a swagger spec
@@ -133,7 +134,11 @@ To generate a [client for a swagger spec](https://goswagger.io/generate/client.h
 ```
 swagger generate client [-f ./swagger.json] -A [application-name [--principal [principal-name]]
 ```
-
+### Generate an CLI (Command line tool)
+To generate a [CLI for a swagger spec](https://github.com/go-swagger/go-swagger/tree/master/examples/cli) document:
+```
+swagger generate cli [-f ./swagger.json] -A [application-name [--principal [principal-name]]
+```
 ### Generate a spec from source
 To generate a [swagger spec document for a go application](https://goswagger.io/generate/spec.html):
 
@@ -167,7 +172,6 @@ Merge specifications (composition):
 swagger mixin {spec1} {spec2}
 ```
 
-
 ### Compare specs
 
 The  diff command allows you to check backwards compatibility.
@@ -175,6 +179,12 @@ Type ```swagger diff --help``` for info.
 
 ```
 swagger diff {spec1} {spec2}
+```
+
+### Generate spec markdown spec
+
+```
+swagger generate markdown -f {spec} --output swagger.mode
 ```
 
 ## Try it
@@ -216,29 +226,32 @@ Iron.io
 [RackHD](https://github.com/RackHD/RackHD)  
 [ScaleFT](https://github.com/authclub/billforward)  
 [StratoScale](https://github.com/Stratoscale/swagger)  
-[VMWare](https://github.com/vmware/dispatch)  
+[Terraform Provider OpenAPI](https://github.com/dikhan/terraform-provider-openapi)  
+[VMware](https://github.com/vmware/dispatch)  
 ...
 
 ## Note to users migrating from older releases
 
-### Using 0.5.0
+### Migrating from 0.25 to [master]
 
-Because 0.5.0 and master have diverged significantly, you should checkout the tag 0.5.0 for go-swagger when you use the currently released version.
+Changes in the behavior of the generated client regarding defaults in parameters and response headers:
 
-### Migrating from 0.5.0 to 0.6.0
+  * default values for parameters are no more hydrated by default and sent over the wire
+    (assuming the server uses defaults).
+  * the previous behavior (explicitly sending defaults over the wire) can be obtained
+    with the SetDefaults() and WithDefaults() parameter methods.
+  * the body parameter is not pre-hydrated with the default from it schema
+  * default values for response headers are hydrated when the header is not received
+    (previously, headers remained with their zero value)
 
-You will have to rename some imports:
+### Migrating from 0.24 to 0.25
 
-```
-github.com/go-swagger/go-swagger/httpkit/validate to github.com/go-openapi/validate
-github.com/go-swagger/go-swagger/httpkit to github.com/go-openapi/runtime
-github.com/naoina/denco to github.com/go-openapi/runtime/middleware/denco
-github.com/go-swagger/go-swagger to github.com/go-openapi
-```
+The options for `generate model --all-definitions` and `--skip-struct` are marked for deprecation. 
 
-### Migrating from 0.12 to 0.13
+For now, the CLI continues to accept these options. They will be removed in a future version.
 
-Spec flattening and $ref resolution brought breaking changes in model generation, since all complex things generate their own definitions.
+Generating all definitions is now the default behavior when no other option filters the generation scope.
+The `--skip-struct` option had no effect.
 
 ### Migrating from 0.14 to 0.15
 
@@ -252,3 +265,22 @@ Spec flattening now defaults to minimal changes to models and should be workable
 Users who prefer to stick to 0.13 and 0.14 default flattening mode may now use the `--with-flatten=full` option.
 
 Note that the `--skip-flatten` option has been phased out and replaced by the more explicit `--with-expand` option.
+
+### Migrating from 0.12 to 0.13
+
+Spec flattening and $ref resolution brought breaking changes in model generation, since all complex things generate their own definitions.
+
+### Migrating from 0.5.0 to 0.6.0
+
+You will have to rename some imports:
+
+```
+github.com/go-swagger/go-swagger/httpkit/validate to github.com/go-openapi/validate
+github.com/go-swagger/go-swagger/httpkit to github.com/go-openapi/runtime
+github.com/naoina/denco to github.com/go-openapi/runtime/middleware/denco
+github.com/go-swagger/go-swagger to github.com/go-openapi
+```
+
+### Using 0.5.0
+
+Because 0.5.0 and master have diverged significantly, you should checkout the tag 0.5.0 for go-swagger when you use the currently released version.

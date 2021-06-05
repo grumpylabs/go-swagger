@@ -85,6 +85,10 @@ func (ht responseTypable) WithEnum(values ...interface{}) {
 	ht.header.WithEnum(values)
 }
 
+func (ht responseTypable) WithEnumDescription(desc string) {
+	// no
+}
+
 type headerValidations struct {
 	current *spec.Header
 }
@@ -402,6 +406,12 @@ func (r *responseBuilder) buildFromStruct(decl *entityDecl, tpe *types.Struct, r
 					return nil, err
 				}
 				return append(taggers, otherTaggers...), nil
+			case *ast.SelectorExpr:
+				otherTaggers, err := parseArrayTypes(iftpe.Sel, items.Items, level+1)
+				if err != nil {
+					return nil, err
+				}
+				return otherTaggers, nil
 			case *ast.StarExpr:
 				otherTaggers, err := parseArrayTypes(iftpe.X, items, level)
 				if err != nil {

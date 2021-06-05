@@ -76,6 +76,13 @@ func (st schemaTypable) WithEnum(values ...interface{}) {
 	st.schema.WithEnum(values...)
 }
 
+func (st schemaTypable) WithEnumDescription(desc string) {
+	if desc == "" {
+		return
+	}
+	st.AddExtension(extEnumDesc, desc)
+}
+
 type schemaValidations struct {
 	current *spec.Schema
 }
@@ -159,7 +166,13 @@ func (s *schemaBuilder) buildFromDecl(decl *entityDecl, schema *spec.Schema) err
 	// analyze doc comment for the model
 	sp := new(sectionedParser)
 	sp.setTitle = func(lines []string) { schema.Title = joinDropLast(lines) }
-	sp.setDescription = func(lines []string) { schema.Description = joinDropLast(lines) }
+	sp.setDescription = func(lines []string) {
+		schema.Description = joinDropLast(lines)
+		enumDesc := getEnumDesc(schema.VendorExtensible.Extensions)
+		if enumDesc != "" {
+			schema.Description += "\n" + enumDesc
+		}
+	}
 	if err := sp.Parse(s.decl.Comments); err != nil {
 		return err
 	}
@@ -188,8 +201,8 @@ func (s *schemaBuilder) buildFromDecl(decl *entityDecl, schema *spec.Schema) err
 		debugLog("map: %v -> [%v]%v", s.decl.Ident.Name, tpe.Key().String(), tpe.Elem().String())
 	case *types.Named:
 		o := tpe.Obj()
-		debugLog("got the named type object: %s.%s | isAlias: %t | exported: %t", o.Pkg().Path(), o.Name(), o.IsAlias(), o.Exported())
 		if o != nil {
+			debugLog("got the named type object: %s.%s | isAlias: %t | exported: %t", o.Pkg().Path(), o.Name(), o.IsAlias(), o.Exported())
 			if o.Pkg().Name() == "time" && o.Name() == "Time" {
 				schema.Typed("string", "date-time")
 				return nil
@@ -238,7 +251,7 @@ func (s *schemaBuilder) buildFromType(tpe types.Type, tgt swaggerTypable) error 
 	case *types.Array:
 		return s.buildFromType(titpe.Elem(), tgt.Items())
 	case *types.Map:
-		//debugLog("map: %v -> [%v]%v", fld.Name(), ftpe.Key().String(), ftpe.Elem().String())
+		// debugLog("map: %v -> [%v]%v", fld.Name(), ftpe.Key().String(), ftpe.Elem().String())
 		// check if key is a string type, if not print a message
 		// and skip the map property. Only maps with string keys can go into additional properties
 		sch := tgt.Schema()
@@ -308,11 +321,14 @@ func (s *schemaBuilder) buildFromType(tpe types.Type, tgt swaggerTypable) error 
 			}
 
 			if enumName, ok := enumName(cmt); ok {
-				enumValues, _ := s.ctx.FindEnumValues(pkg, enumName)
+				enumValues, enumDesces, _ := s.ctx.FindEnumValues(pkg, enumName)
 				if len(enumValues) > 0 {
 					tgt.WithEnum(enumValues...)
 					enumTypeName := reflect.TypeOf(enumValues[0]).String()
 					_ = swaggerSchemaForType(enumTypeName, tgt)
+				}
+				if len(enumDesces) > 0 {
+					tgt.WithEnumDescription(strings.Join(enumDesces, "\n"))
 				}
 				return nil
 			}
@@ -387,7 +403,6 @@ func (s *schemaBuilder) buildFromType(tpe types.Type, tgt swaggerTypable) error 
 			return nil
 		}
 	default:
-		//log.Printf("WARNING: can't determine refined type %s (%T)", titpe.String(), titpe)
 		panic(fmt.Sprintf("WARNING: can't determine refined type %s (%T)", titpe.String(), titpe))
 	}
 
@@ -429,7 +444,7 @@ func (s *schemaBuilder) buildFromInterface(decl *entityDecl, it *types.Interface
 					continue
 				}
 
-				//decl.
+				// decl.
 				debugLog("maybe interface field %s: %s(%T)", o.Name(), o.Type().String(), o.Type())
 				afld = an
 				break
@@ -514,7 +529,7 @@ func (s *schemaBuilder) buildFromInterface(decl *entityDecl, it *types.Interface
 
 		var afld *ast.Field
 		ans, _ := astutil.PathEnclosingInterval(decl.File, fld.Pos(), fld.Pos())
-		//debugLog("got %d nodes (exact: %t)", len(ans), isExact)
+		// debugLog("got %d nodes (exact: %t)", len(ans), isExact)
 		for _, an := range ans {
 			at, valid := an.(*ast.Field)
 			if !valid {
@@ -600,7 +615,7 @@ func (s *schemaBuilder) buildFromStruct(decl *entityDecl, st *types.Struct, sche
 		debugLog("maybe allof field(%t) %s: %s (%T) [%q](anon: %t, embedded: %t)", fld.IsField(), fld.Name(), fld.Type().String(), fld.Type(), tg, fld.Anonymous(), fld.Embedded())
 		var afld *ast.Field
 		ans, _ := astutil.PathEnclosingInterval(decl.File, fld.Pos(), fld.Pos())
-		//debugLog("got %d nodes (exact: %t)", len(ans), isExact)
+		// debugLog("got %d nodes (exact: %t)", len(ans), isExact)
 		for _, an := range ans {
 			at, valid := an.(*ast.Field)
 			if !valid {
@@ -696,7 +711,7 @@ func (s *schemaBuilder) buildFromStruct(decl *entityDecl, st *types.Struct, sche
 
 		var afld *ast.Field
 		ans, _ := astutil.PathEnclosingInterval(decl.File, fld.Pos(), fld.Pos())
-		//debugLog("got %d nodes (exact: %t)", len(ans), isExact)
+		// debugLog("got %d nodes (exact: %t)", len(ans), isExact)
 		for _, an := range ans {
 			at, valid := an.(*ast.Field)
 			if !valid {
@@ -706,6 +721,11 @@ func (s *schemaBuilder) buildFromStruct(decl *entityDecl, st *types.Struct, sche
 			debugLog("field %s: %s(%T) [%q] ==> %s", fld.Name(), fld.Type().String(), fld.Type(), tg, at.Doc.Text())
 			afld = at
 			break
+		}
+
+		if afld == nil {
+			debugLog("can't find source associated with %s", fld.String())
+			continue
 		}
 
 		// if the field is annotated with swagger:ignore, ignore it
@@ -875,7 +895,13 @@ func (s *schemaBuilder) createParser(nm string, schema, ps *spec.Schema, fld *as
 	}
 
 	if ps.Ref.String() == "" {
-		sp.setDescription = func(lines []string) { ps.Description = joinDropLast(lines) }
+		sp.setDescription = func(lines []string) {
+			ps.Description = joinDropLast(lines)
+			enumDesc := getEnumDesc(ps.VendorExtensible.Extensions)
+			if enumDesc != "" {
+				ps.Description += "\n" + enumDesc
+			}
+		}
 		sp.taggers = []tagParser{
 			newSingleLineTagParser("maximum", &setMaximum{schemaValidations{ps}, rxf(rxMaximumFmt, "")}),
 			newSingleLineTagParser("minimum", &setMinimum{schemaValidations{ps}, rxf(rxMinimumFmt, "")}),

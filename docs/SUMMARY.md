@@ -16,14 +16,16 @@
   - [Options and commands](usage/swagger.md)
   - [Serve UI](usage/serve_ui.md)
   - [Validate](usage/validate.md)
+  - [Diff](usage/diff.md)
   - [Transform spec](use/transform.md)
-    - [Diff](usage/diff.md)
     - [Expand](usage/expand.md)
     - [Flatten](usage/flatten.md)
     - [Mixin](usage/mixin.md)
+  - [Generate markdown](usage/markdown.md)
   - Generate code from spec
     - [Dependencies & Requirements](generate/requirements.md)
     - [API Client](generate/client.md)
+    - [CLI (Command Line Tool)](generate/cli.md)
     - API Server
       - [Server Usage](generate/server.md)
       - [How to use the server](use/server.md)

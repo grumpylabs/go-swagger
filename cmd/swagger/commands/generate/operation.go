@@ -54,12 +54,14 @@ type Operation struct {
 	schemeOptions
 	mediaOptions
 
+	ModelPackage string `long:"model-package" short:"m" description:"the package to save the models" default:"models"`
+
 	NoHandler    bool `long:"skip-handler" description:"when present will not generate an operation handler"`
 	NoStruct     bool `long:"skip-parameters" description:"when present will not generate the parameter model struct"`
 	NoResponses  bool `long:"skip-responses" description:"when present will not generate the response model struct"`
 	NoURLBuilder bool `long:"skip-url-builder" description:"when present will not generate a URL builder"`
 
-	Name []string `long:"name" short:"n" required:"true" description:"the operations to generate, repeat for multiple (defaults to all). Same as --operations"`
+	Name []string `long:"name" short:"n" description:"the operations to generate, repeat for multiple (defaults to all). Same as --operations"`
 }
 
 func (o Operation) apply(opts *generator.GenOpts) {
@@ -70,6 +72,7 @@ func (o Operation) apply(opts *generator.GenOpts) {
 	o.schemeOptions.apply(opts)
 	o.mediaOptions.apply(opts)
 
+	opts.ModelPackage = o.ModelPackage
 	opts.IncludeHandler = !o.NoHandler
 	opts.IncludeResponses = !o.NoResponses
 	opts.IncludeParameters = !o.NoStruct
@@ -94,7 +97,7 @@ You can get these now with: go get -u -f %s/...
 
 // Execute generates a model file
 func (o *Operation) Execute(args []string) error {
-	if o.Shared.DumpData && (len(o.Name) > 1 || len(o.Operations.Operations) > 1) {
+	if o.Shared.DumpData && len(append(o.Name, o.Operations.Operations...)) > 1 {
 		return errors.New("only 1 operation at a time is supported for dumping data")
 	}
 
